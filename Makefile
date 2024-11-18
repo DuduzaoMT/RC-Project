@@ -1,14 +1,14 @@
 # Compilador e flags
-CC = gcc
+CC = g++
 
 # Alvos
 all: player gs
 
-player: player.c
-	$(CC) -o player player.c
+player: player.cc
+	$(CC) -o player player.cc
 
-gs: gs.c
-	$(CC) -o gs gs.c
+gs: gs.cc
+	$(CC) -o gs gs.cc
 
 clean:
 	rm -f player gs
