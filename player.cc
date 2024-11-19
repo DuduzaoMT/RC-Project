@@ -20,7 +20,7 @@ using namespace std;
 #define GSIPPREFIX "-n\0"       // GSIP's prefix
 #define GSPORTPREFIX "-p\0"     // Gsport's prefix
 
-#define USERINPUTBUFFER 32      // Buffer to store user input
+#define USERINPUTBUFFER 128     // Buffer to store user input
 
 // Commands
 #define STARTCMD "start\0"      
@@ -30,16 +30,47 @@ using namespace std;
 #define QUITCMD "quit\0"
 #define DEBUGCMD "debug\0"
 
-void parseInput(vector<vector<char>> command){
+int isNumber(char *s)
+{
 
-    char argument[USERINPUTBUFFER];
-
-    while (scanf("%s", argument)){
-        vector<char> parsed(argument, argument+USERINPUTBUFFER);
-        command.push_back(parsed);
-        
+    for (int i = 0; i < strlen(s); i++)
+    {
+        if (!isdigit(s[i]))
+            return false;
     }
-    printf("ola\n");
+    
+    return true;
+}
+
+int verifyArg(char **user_args, int idx, const char *prefix, char *arg_to_change, const char *default_val)
+{
+    if(strcmp(user_args[idx], prefix) == 0)
+    {
+        if (strcmp(default_val, arg_to_change))
+            return 1;
+
+        strcpy(arg_to_change, user_args[idx+1]);
+    }
+    return 0;
+}
+
+int startCmd(char *arguments){
+    int PLID, max_playtime;
+    char PLID_buffer[USERINPUTBUFFER], max_playtime_buffer[USERINPUTBUFFER];
+
+    sscanf(arguments, "%s %s", PLID_buffer, max_playtime_buffer);
+
+    if (strlen(PLID_buffer) == 6 && isNumber(PLID_buffer))
+        PLID = atoi(PLID_buffer);
+    else{
+        fprintf(stderr, "Invalid PLID\n");
+        return 1;
+    }
+    
+
+    printf("%d - %d\n", PLID, max_playtime);
+
+    return 0;
 }
 
 int main(int argc, char **argv) {
@@ -63,23 +94,43 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
-        if(strcmp(argv[i], GSIPPREFIX) == 0)
-            strcpy(GSIP, argv[i+1]);
-        
-        if(strcmp(argv[i], GSPORTPREFIX) == 0)
-            strcpy(GSport, argv[i+1]);
+        if (verifyArg(argv, i, GSIPPREFIX, GSIP, LOCALHOST)){
+            fprintf(stderr, "Invalid arguments\n");
+            exit(1);
+        }
+
+        if (verifyArg(argv, i, GSPORTPREFIX, GSport, PORT)) {
+            fprintf(stderr, "Invalid arguments\n");
+            exit(1);  
+        }
+
     }
 
     printf("IP: %s\nPort: %s\n", GSIP, GSport);
     
     // Player controller
-    vector<vector<char>> command;
-    parseInput(command);
-    printf("%lu\n", command.size());
-    for (int i = 0; i < command.size(); i++)
+    while (1)
     {
-        printf("%s\n", command[i].data());
+        
+        char command[USERINPUTBUFFER], arguments[USERINPUTBUFFER];
+        scanf("%s", command);
+
+        if (!fgets(arguments, sizeof(arguments), stdin))
+        {
+            fprintf(stderr, "Invalid command\n");
+            continue;
+        }
+        
+
+        if (strcmp(command, "start")==0)
+            if (startCmd(arguments)){
+                fprintf(stderr, "Command error\n");
+                continue;
+            }
+        
+
     }
+    
     
 
     // Criação do socket UDP
