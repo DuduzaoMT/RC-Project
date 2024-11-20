@@ -162,31 +162,29 @@ int tryCmd(char *arguments,char* GSIP, char* GSport, int trial_number, int PLID)
     char C1,C2,C3,C4;
     char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER], expected_response[GENERALSIZEBUFFER];
 
-    int n_colors = 6,n_guess = 4,match_colors=0,n, nB=0,nW=0,r_trial_number=trial_number,try_plid,n_args;
-    char colors[n_colors] = "RGBYOP";
+    const int n_colors = 6, n_guess = 4;
 
-    char guess_colors[n_guess];
+    int match_colors=0,n,nB,nW,r_trial_number=-1;
 
-    n_args = sscanf(arguments, "%06d %c %c %c %c", &try_plid, &C1,&C2,&C3,&C4);
+    char colors[n_colors] = {'R','G','B','Y','O','P'};
 
-    if( try_plid != PLID){
-        fprintf(stderr, "Invalid PLID\n");
-        return 1;
-    }
-    if (n_args != 5){
+    int n_args = sscanf(arguments, "%s %s %s %s", &C1,&C2,&C3,&C4);
+
+    if (n_args != 4 || strlen(arguments) != 9){
         fprintf(stderr, "Invalid Colors\n");
         return 1;
     }
 
-    sprintf(guess_colors,"%c%c%c%c",C1,C2,C3,C4);
-    for (int i=0;i<n_colors;i++){
-        for (int j=0; j<n_guess;j++){
-            if(guess_colors[j] == colors[i]){
-                match_colors+=1;
-            }
-        }
-    }
+    char guess_colors[n_guess] = {C1, C2, C3, C4};    
 
+    for (int i = 0; i < n_guess; i++)
+        for (int j = 0; j < n_colors; j++)
+            if (guess_colors[i] == colors[j])
+            {
+                match_colors++;
+                break;
+            }
+            
     if (match_colors != 4){
         fprintf(stderr, "Invalid Colors\n");
         return 1;
@@ -253,7 +251,7 @@ int main(int argc, char **argv) {
     
     // Player controller
 
-    while (trial_number <= 8 && !end_game)
+    while (1)
     {
         char command[USERINPUTBUFFER], arguments[USERINPUTBUFFER];
         scanf("%s", command);
