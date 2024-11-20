@@ -4,11 +4,11 @@ CC = g++
 # Alvos
 all: player gs
 
-player: player.cc
-	$(CC) -o player player.cc
+player: player.cpp
+	$(CC) -o player player.cpp
 
-gs: gs.cc
-	$(CC) -o gs gs.cc
+gs: gs.cpp
+	$(CC) -o gs gs.cpp
 
 clean:
 	rm -f player gs

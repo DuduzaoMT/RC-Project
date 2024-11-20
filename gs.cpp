@@ -27,8 +27,8 @@ int main() {
     // Configuração do endereço local (localhost)
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;       // IPv4
-    hints.ai_socktype = SOCK_DGRAM; // Socket UDP
-    hints.ai_flags = AI_PASSIVE;    // Aceita conexões
+    hints.ai_socktype = SOCK_DGRAM;  // Socket UDP
+    hints.ai_flags = AI_PASSIVE;     // Aceita conexões
 
     errcode = getaddrinfo(NULL, PORT, &hints, &res);
     if (errcode != 0) {
@@ -45,13 +45,14 @@ int main() {
 
     // Loop para receber e responder mensagens
     while (1) {
+        
         addrlen = sizeof(addr);
         n = recvfrom(fd, buffer, 128, 0, (struct sockaddr *)&addr, &addrlen);
         if (n == -1) {
             perror("recvfrom");
             exit(1);
         }
-
+    
         write(1, "Received: ", 10);
         write(1, buffer, n);
 

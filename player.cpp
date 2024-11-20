@@ -33,6 +33,7 @@ using namespace std;
 #define QUITCMD "quit\0"
 #define DEBUGCMD "debug\0"
 
+// Verifies is a set of chars is a number
 int isNumber(char *s)
 {
 
@@ -45,6 +46,7 @@ int isNumber(char *s)
     return true;
 }
 
+// Verifies the arguments of the program once it is called
 int verifyArg(char **user_args, int idx, const char *prefix, char *arg_to_change, const char *default_val)
 {
     if(strcmp(user_args[idx], prefix) == 0)
@@ -57,6 +59,7 @@ int verifyArg(char **user_args, int idx, const char *prefix, char *arg_to_change
     return 0;
 }
 
+// Full UDP connection
 int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
 
     int fd, errcode, argValid,message_received=0;
@@ -64,17 +67,17 @@ int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
     socklen_t addrlen;
     struct addrinfo hints, *res;
 
-    // Criação do socket UDP
+    // UDP socket creation
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) {
         perror("socket");
         exit(1);
     }
 
-    // Configuração do endereço do servidor
+    // Server info configuration
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;       // IPv4
-    hints.ai_socktype = SOCK_DGRAM; // Socket UDP
+    hints.ai_socktype = SOCK_DGRAM;  // Socket UDP
 
     errcode = getaddrinfo(GSIP, GSport, &hints, &res);
     if (errcode != 0) {
@@ -83,24 +86,26 @@ int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
     }
 
     while (message_received == 0){
-        // Envio de mensagem para o servidor
+        // Send message to server
         send = sendto(fd, request, strlen(request)+1, 0, res->ai_addr, res->ai_addrlen);
         if (send == -1) {
             perror("sendto");
             exit(1);
         }
 
-        // Recebimento de resposta do servidor
+        // Receive message from server
         addrlen = sizeof(struct sockaddr_in);
         rec = recvfrom(fd, response, 128, 0, (struct sockaddr *)res->ai_addr, &addrlen);
 
         // TODO - associar um timer para esperar no max 3 segundos pela resposta do servidor
 
-        if (rec == -1) {
+        if (rec == -1)
+        {
             perror("recvfrom");
             exit(1);
         }
-        if( rec != 0 ){message_received = 1;}
+        if (rec != 0)
+            message_received = 1;
 
     }
     freeaddrinfo(res);
@@ -109,36 +114,42 @@ int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
 }
 
 int startCmd(char *arguments,char* GSIP, char* GSport){
-    int PLID, max_playtime,parsed_max_playtime,n;
-    char PLID_buffer[USERINPUTBUFFER], max_playtime_buffer[USERINPUTBUFFER],final_max_play[16];
+    int PLID, max_playtime,n;
+    char PLID_buffer[USERINPUTBUFFER], max_playtime_buffer[USERINPUTBUFFER];
     char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
+
+    // Reset the buffers
+    strcpy(PLID_buffer, "");
+    strcpy(max_playtime_buffer, "");
 
     sscanf(arguments, "%s %s", PLID_buffer, max_playtime_buffer);
 
     if (strlen(PLID_buffer) == 6 && isNumber(PLID_buffer))
         PLID = atoi(PLID_buffer);
+        
     else{
-        fprintf(stderr, "(Invalid PLID)\t");
+        fprintf(stderr, "Invalid PLID\n");
         return 1;
     }
-    parsed_max_playtime = atoi(max_playtime_buffer);
-    if (isNumber(max_playtime_buffer) && parsed_max_playtime > 0 && parsed_max_playtime <= 600){
-        sprintf(final_max_play,"%03d",parsed_max_playtime);
-    }
-    else{
-        fprintf(stderr, "(Invalid max_playtime)\t");
-        return 1;
+    
+    
+    if (isNumber(max_playtime_buffer)){
+        max_playtime = atoi(max_playtime_buffer);
+        if (max_playtime <= 0 || max_playtime > 600){
+            fprintf(stderr, "Invalid max_playtime\n");
+            return 1;
+        }
     }
 
-    sprintf(request,"SNG %d %s\n",PLID,final_max_play);
+    sprintf(request,"SNG %06d %03d\n",PLID,max_playtime);
 
     // Exibição da resposta do servidor
     n = UDPInteraction(request,response, GSIP,GSport);
     if(!strcmp(response,"RSG OK\n")){
-        fprintf(stdout,"New Game started (max %s sec)\n", final_max_play);
+        fprintf(stdout,"New Game started (max %d sec)\n", max_playtime);
     }
     else{
-        fprintf(stderr, "(Connection Lost)\t");
+        fprintf(stderr, "Connection Lost\n");
         return 1;
     }
 
@@ -146,7 +157,7 @@ int startCmd(char *arguments,char* GSIP, char* GSport){
     return 0;
 }
 
-int tryCmd(char *arguments,char* GSIP, char* GSport){
+int tryCmd(char *arguments,char* GSIP, char* GSport, int trial_number, int plid){
     return 0;
 }
 
@@ -155,6 +166,9 @@ int main(int argc, char **argv) {
 
     char GSIP[MAXIPSIZE] = LOCALHOST;
     char GSport[MAXPORTSIZE] = PORT;
+
+    int trial_number = 0;
+    int PLID;
 
     int player_connected = true;
 
@@ -185,23 +199,22 @@ int main(int argc, char **argv) {
     {
         char command[USERINPUTBUFFER], arguments[USERINPUTBUFFER];
         scanf("%s", command);
-
+        
         // commands with arguments 
         if (fgets(arguments, sizeof(arguments), stdin)){
-            printf("%s",arguments);
-            if (!strcmp(command, "start")){
-                if (startCmd(arguments,GSIP,GSport)){
+
+            if (!strcmp(command, "start"))
+                if (startCmd(arguments,GSIP,GSport))
                     fprintf(stderr, "Command error\n");
-                }
-            }
+
             else if(!strcmp(command,"try")){
-                if(tryCmd(arguments,GSIP,GSport)){
+                if(tryCmd(arguments,GSIP,GSport,trial_number,PLID))
                     fprintf(stderr, "Command error\n");
-                }
+                else
+                    trial_number++;  
             }
-            else{
+            else
                 fprintf(stderr, "Invalid command\n");
-            }
         }
         // commands without arguments  
         else{
