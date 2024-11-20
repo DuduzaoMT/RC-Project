@@ -59,8 +59,8 @@ int verifyArg(char **user_args, int idx, const char *prefix, char *arg_to_change
 
 int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
 
-    int fd, errcode, argValid;
-    ssize_t n;
+    int fd, errcode, argValid,message_received=0;
+    ssize_t send,rec;
     socklen_t addrlen;
     struct addrinfo hints, *res;
 
@@ -82,24 +82,30 @@ int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
         exit(1);
     }
 
-    // Envio de mensagem para o servidor
-    n = sendto(fd, request, strlen(request)+1, 0, res->ai_addr, res->ai_addrlen);
-    if (n == -1) {
-        perror("sendto");
-        exit(1);
-    }
+    while (message_received == 0){
+        // Envio de mensagem para o servidor
+        send = sendto(fd, request, strlen(request)+1, 0, res->ai_addr, res->ai_addrlen);
+        if (send == -1) {
+            perror("sendto");
+            exit(1);
+        }
 
-    // Recebimento de resposta do servidor
-    addrlen = sizeof(struct sockaddr_in);
-    n = recvfrom(fd, response, 128, 0, (struct sockaddr *)res->ai_addr, &addrlen);
-    if (n == -1) {
-        perror("recvfrom");
-        exit(1);
-    }
+        // Recebimento de resposta do servidor
+        addrlen = sizeof(struct sockaddr_in);
+        rec = recvfrom(fd, response, 128, 0, (struct sockaddr *)res->ai_addr, &addrlen);
 
+        // TODO - associar um timer para esperar no max 3 segundos pela resposta do servidor
+
+        if (rec == -1) {
+            perror("recvfrom");
+            exit(1);
+        }
+        if( rec != 0 ){message_received = 1;}
+
+    }
     freeaddrinfo(res);
     close(fd);
-    return n;
+    return rec;
 }
 
 int startCmd(char *arguments,char* GSIP, char* GSport){
@@ -127,7 +133,8 @@ int startCmd(char *arguments,char* GSIP, char* GSport){
     sprintf(request,"SNG %d %s\n",PLID,final_max_play);
 
     // Exibição da resposta do servidor
-    if((n = UDPInteraction(request,response, GSIP,GSport) == strlen("RSG OK\n"))){
+    n = UDPInteraction(request,response, GSIP,GSport);
+    if(!strcmp(response,"RSG OK\n")){
         fprintf(stdout,"New Game started (max %s sec)\n", final_max_play);
     }
     else{
@@ -135,6 +142,11 @@ int startCmd(char *arguments,char* GSIP, char* GSport){
         return 1;
     }
 
+    // TODO - Inicializar o timer/cronometro
+    return 0;
+}
+
+int tryCmd(char *arguments,char* GSIP, char* GSport){
     return 0;
 }
 
@@ -174,15 +186,38 @@ int main(int argc, char **argv) {
         char command[USERINPUTBUFFER], arguments[USERINPUTBUFFER];
         scanf("%s", command);
 
-        if (!fgets(arguments, sizeof(arguments), stdin)){
-            fprintf(stderr, "Invalid command\n");
-            continue;
+        // commands with arguments 
+        if (fgets(arguments, sizeof(arguments), stdin)){
+            printf("%s",arguments);
+            if (!strcmp(command, "start")){
+                if (startCmd(arguments,GSIP,GSport)){
+                    fprintf(stderr, "Command error\n");
+                }
+            }
+            else if(!strcmp(command,"try")){
+                if(tryCmd(arguments,GSIP,GSport)){
+                    fprintf(stderr, "Command error\n");
+                }
+            }
+            else{
+                fprintf(stderr, "Invalid command\n");
+            }
         }
-        
-        if (strcmp(command, "start") == 0){
-            if (startCmd(arguments,GSIP,GSport)){
-                fprintf(stderr, "Command error\n");
-                continue;
+        // commands without arguments  
+        else{
+            if (!strcmp(command, "sb") || !strcmp(command,"scoreboard")){
+            }
+
+            else if (!strcmp(command, "st") || !strcmp(command,"show_trials")){
+            }
+
+            else if (!strcmp(command, "quit")){
+            }
+
+            else if (!strcmp(command, "exit")){
+            }
+            else{
+                fprintf(stderr, "Invalid command\n");
             }
         }
     }

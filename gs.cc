@@ -56,11 +56,12 @@ int main() {
         write(1, buffer, n);
 
         // Envia de volta o mesmo conteúdo recebido
-        n = sendto(fd, buffer, n, 0, (struct sockaddr *)&addr, addrlen);
+        n = sendto(fd, "RSG OK\n", 8, 0, (struct sockaddr *)&addr, addrlen);
         if (n == -1) {
             perror("sendto");
             exit(1);
         }
+
     }
 
     freeaddrinfo(res);
