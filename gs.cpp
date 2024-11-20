@@ -46,6 +46,9 @@ int main() {
     // Loop para receber e responder mensagens
     while (1) {
         
+        char cmd[3]; 
+        int PLID;
+
         addrlen = sizeof(addr);
         n = recvfrom(fd, buffer, 128, 0, (struct sockaddr *)&addr, &addrlen);
         if (n == -1) {
@@ -57,12 +60,26 @@ int main() {
         write(1, buffer, n);
 
         // Envia de volta o mesmo conteúdo recebido
-        n = sendto(fd, "RSG OK\n", 8, 0, (struct sockaddr *)&addr, addrlen);
-        if (n == -1) {
-            perror("sendto");
-            exit(1);
+        if (!strncmp(buffer,"SNG",3)){
+            n = sendto(fd, "RSG OK\n", 8, 0, (struct sockaddr *)&addr, addrlen);
+            if (n == -1) {
+                perror("sendto");
+                exit(1);
+            }
         }
+        else if(!strncmp(buffer,"TRY",3)){
+            char C1,C2,C3,C4;
+            int trial_number,nW = 1,nB = 2;
+            char response[128];
 
+            sscanf(buffer,"TRY %06d %c %c %c %c %d\n", &PLID, &C1,&C2,&C3,&C4,&trial_number);
+            sprintf(response,"RTR OK %d %d %d",trial_number,nB,nW);
+            n = sendto(fd, response, 15, 0, (struct sockaddr *)&addr, addrlen);
+            if (n == -1) {
+                perror("sendto");
+                exit(1);
+            }
+        }
     }
 
     freeaddrinfo(res);
