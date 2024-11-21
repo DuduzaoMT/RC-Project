@@ -73,8 +73,17 @@ int main() {
             char response[128];
 
             sscanf(buffer,"TRY %06d %c %c %c %c %d\n", &PLID, &C1,&C2,&C3,&C4,&trial_number);
-            sprintf(response,"RTR OK %d %d %d",trial_number,nB,nW);
+            sprintf(response,"RTR OK %d %d %d\n",trial_number,nB,nW);
+            //sprintf(response,"RTR ENT %c %c %c %c\n",C1,C2,C3,C4);
+            //sprintf(response,"RTR ENT %c %c %c %c\n",C1,C2,C3,C4);
             n = sendto(fd, response, 15, 0, (struct sockaddr *)&addr, addrlen);
+            if (n == -1) {
+                perror("sendto");
+                exit(1);
+            }
+        }
+        else if(!strncmp(buffer,"QUIT",3)){
+            n = sendto(fd, "RQT OK", 6, 0, (struct sockaddr *)&addr, addrlen);
             if (n == -1) {
                 perror("sendto");
                 exit(1);

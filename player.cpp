@@ -32,6 +32,9 @@ using namespace std;
 #define SCOREBOARDCMD "scoreboard\0" or "sb\0"
 #define QUITCMD "quit\0"
 #define DEBUGCMD "debug\0"
+#define TRUE 1
+#define FALSE 0
+#define ERRO 2
 
 // Verifies is a set of chars is a number
 int isNumber(char *s)
@@ -114,7 +117,7 @@ int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
 }
 
 int startCmd(char *arguments,char* GSIP, char* GSport,int &PLID, int &max_playtime){
-    int n;
+
     char PLID_buffer[USERINPUTBUFFER], max_playtime_buffer[USERINPUTBUFFER];
     char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
 
@@ -129,7 +132,7 @@ int startCmd(char *arguments,char* GSIP, char* GSport,int &PLID, int &max_playti
         
     else{
         fprintf(stderr, "Invalid PLID\n");
-        return 1;
+        return ERRO;
     }
     
     
@@ -137,34 +140,38 @@ int startCmd(char *arguments,char* GSIP, char* GSport,int &PLID, int &max_playti
         max_playtime = atoi(max_playtime_buffer);
         if (max_playtime <= 0 || max_playtime > 600){
             fprintf(stderr, "Invalid max_playtime\n");
-            return 1;
+            return ERRO;
         }
     }
 
     sprintf(request,"SNG %06d %03d\n",PLID,max_playtime);
 
     // Exibição da resposta do servidor
-    n = UDPInteraction(request,response, GSIP,GSport);
+    UDPInteraction(request,response, GSIP,GSport);
     if(!strcmp(response,"RSG OK\n")){
         fprintf(stdout,"New Game started (max %d sec)\n", max_playtime);
     }
+    else if(!strcmp(response,"RSG NOK\n")){
+        fprintf(stdout,"The player with PLID:%06d has an ongoing game", PLID);
+        return ERRO;
+    }
     else{
         fprintf(stderr, "Connection Lost\n");
-        return 1;
+        return ERRO;
     }
 
     // TODO - Inicializar o timer/cronometro
-    return 0;
+    return FALSE;
 }
 
-int tryCmd(char *arguments,char* GSIP, char* GSport, int trial_number, int PLID){
+int tryCmd(char *arguments,char* GSIP, char* GSport, int* trial_number, int PLID){
 
     char C1,C2,C3,C4;
-    char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER], expected_response[GENERALSIZEBUFFER];
+    char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
 
     const int n_colors = 6, n_guess = 4;
 
-    int match_colors=0,n,nB,nW,r_trial_number=-1;
+    int match_colors=0,nB,nW,r_trial_number=-1;
 
     char colors[n_colors] = {'R','G','B','Y','O','P'};
 
@@ -172,7 +179,7 @@ int tryCmd(char *arguments,char* GSIP, char* GSport, int trial_number, int PLID)
 
     if (n_args != 4 || strlen(arguments) != 9){
         fprintf(stderr, "Invalid Colors\n");
-        return 1;
+        return ERRO;
     }
 
     char guess_colors[n_guess] = {C1, C2, C3, C4};    
@@ -187,31 +194,74 @@ int tryCmd(char *arguments,char* GSIP, char* GSport, int trial_number, int PLID)
             
     if (match_colors != 4){
         fprintf(stderr, "Invalid Colors\n");
-        return 1;
+        return ERRO;
     }
 
-    sprintf(request,"TRY %06d %c %c %c %c %d\n",PLID,C1,C2,C3,C4,trial_number);
+    sprintf(request,"TRY %06d %c %c %c %c %d\n",PLID,C1,C2,C3,C4,(*trial_number));
 
     // Exibição da resposta do servidor
-    n = UDPInteraction(request,response, GSIP,GSport);
+    UDPInteraction(request,response, GSIP,GSport);
     if(!strncmp(response,"RTR OK",6) ){
         sscanf(response,"RTR OK %d %d %d\n",&r_trial_number,&nB,&nW);
-
-        if (r_trial_number==trial_number){
-            fprintf(stdout,"nB = %d, nW=%d\n",nB,nW);
+        if (nB == 4){
+            fprintf(stdout,"Congrats, you guessed right! SK:%c %c %c %c\n", C1,C2,C3,C4);
+            return FALSE;
         }
-        else{
-           fprintf(stderr, "Something went wrong, Try again\n");
-           return 1; 
-        }
+        fprintf(stdout,"nB = %d, nW=%d\n",nB,nW);
+        (*trial_number)++;
+    }
+    else if(!strncmp(response,"RTR DUP",7)){
+        fprintf(stdout,"(Secret Key guess repeats a previous trial`s guess): nB = %d, nW=%d\n",nB,nW);
+    }
+    //(invalid PLID - not having an ongoing game f.e.)
+    else if(!strncmp(response,"RTR NOK",7)){
+        fprintf(stderr,"Out of context\n");
+        return ERRO;
+    }
+    // no more attemps available
+    else if(!strncmp(response,"RTR ENT",7)){
+        sscanf(response,"RTR ENT %c %c %c %c\n",&C1,&C2,&C3,&C4);
+        fprintf(stdout,"Secret Key was: %c %c %c %c\n", C1,C2,C3,C4);
+    }
+    // max time exceeded
+    else if(!strncmp(response,"RTR ETM",7)){
+        sscanf(response,"RTR ETM %c %c %c %c\n",&C1,&C2,&C3,&C4);
+        fprintf(stdout,"Secret Key was: %c %c %c %c\n", C1,C2,C3,C4);
     }
     else{
         fprintf(stderr, "Connection Lost\n");
-        return 1;
+        return ERRO;
     }
+    return FALSE; 
+}
 
-    return 0;
-    
+int quitCmd(char* GSIP, char* GSport,int PLID){
+
+    char C1,C2,C3,C4;
+    char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
+
+    sprintf(request,"QUIT %06d\n",PLID);
+
+    UDPInteraction(request,response, GSIP,GSport);
+
+    if(!strncmp(response,"RQT OK",6) ){
+        sscanf(response,"RQT OK %c %c %c %c\n",&C1,&C2,&C3,&C4);
+        fprintf(stdout,"Secret Key was: %c %c %c %c\n", C1,C2,C3,C4);
+    }
+    // PLID not have an ongoing game
+    else if(!strncmp(response,"RTR NOK",7)){
+        fprintf(stdout,"PLID %06d did not have an ongoing game\n", PLID);
+    }
+    else{
+        fprintf(stderr, "Connection Lost\n");
+        return ERRO;
+    }
+    return FALSE;
+}
+
+int exitCmd(char* GSIP, char* GSport,int PLID){
+    quitCmd(GSIP,GSport,PLID);
+    return TRUE;
 }
 
 
@@ -221,9 +271,10 @@ int main(int argc, char **argv) {
     char GSport[MAXPORTSIZE] = PORT;
 
     int trial_number = 1;
+    int exit_application = FALSE;
     int PLID = 0;
     int max_playtime = 0;
-    int end_game = 0;
+    int r=0;
 
     int player_connected = true;
 
@@ -251,39 +302,41 @@ int main(int argc, char **argv) {
     
     // Player controller
 
-    while (1)
+    while (exit_application != TRUE)
     {
         char command[USERINPUTBUFFER], arguments[USERINPUTBUFFER];
         scanf("%s", command);
         
-        // commands with arguments 
         if (fgets(arguments, sizeof(arguments), stdin)){
 
+            // commands with arguments
             if (!strcmp(command, "start")){
-                if (startCmd(arguments,GSIP,GSport,PLID,max_playtime))
+                if (startCmd(arguments,GSIP,GSport,PLID,max_playtime) == ERRO)
                     fprintf(stderr, "Command error\n");
             }
             else if(!strcmp(command,"try")){
-                if(tryCmd(arguments,GSIP,GSport,trial_number,PLID))
-                    fprintf(stderr, "Command error\n");
-                else
-                    trial_number++;  
+                if(tryCmd(arguments,GSIP,GSport,&trial_number,PLID) == ERRO){
+                    fprintf(stderr, "Command error\n"); 
+                }
             }
-            else
-                fprintf(stderr, "Invalid command\n");
-        }
-        // commands without arguments  
-        else{
-            if (!strcmp(command, "sb") || !strcmp(command,"scoreboard")){
+            // commands without arguments  
+            else if (!strcmp(command, "sb") || !strcmp(command,"scoreboard")){
             }
 
             else if (!strcmp(command, "st") || !strcmp(command,"show_trials")){
             }
 
             else if (!strcmp(command, "quit")){
+                if(quitCmd(GSIP,GSport,PLID) == ERRO){
+                    fprintf(stderr, "Command error\n"); 
+                }
             }
 
             else if (!strcmp(command, "exit")){
+                exit_application = exitCmd(GSIP,GSport,PLID);
+                if(exit_application == ERRO){
+                    fprintf(stderr, "Command error\n"); 
+                }
             }
             else{
                 fprintf(stderr, "Invalid command\n");
