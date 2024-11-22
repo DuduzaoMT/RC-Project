@@ -107,13 +107,78 @@ int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
             perror("recvfrom");
             exit(1);
         }
-        if (rec != 0)
+        if (rec > 0)
             message_received = 1;
 
     }
     freeaddrinfo(res);
     close(fd);
-    return rec;
+    return 0;
+}
+
+// Full TCP connection
+int TCPInteraction(char* request,char* response, char* GSIP, char* GSport){
+
+    int fd, errcode,nbytes,nleft,nwritten,nread;
+    ssize_t n;
+    socklen_t addrlen;
+    struct addrinfo hints, *res;
+    struct sockaddr_in addr;
+
+    // Create the socket
+    fd = socket(AF_INET, SOCK_STREAM, 0); // TCP socket
+    if (fd == -1) {
+        perror("Socket creation failed");
+        exit(1);
+    }
+
+    // Initialize the hints structure
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;        // IPv4
+    hints.ai_socktype = SOCK_STREAM; // TCP socket
+
+    // Resolve server address
+    errcode = getaddrinfo(GSIP, GSport, &hints, &res);
+    if (errcode != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(errcode));
+        exit(1);
+    }
+
+    // Connect to the server
+    n = connect(fd, res->ai_addr, res->ai_addrlen);
+    if (n == -1) {
+        perror("Connection failed");
+        freeaddrinfo(res);
+        close(fd);
+        exit(1);
+    }
+
+    nbytes=strlen(request)+1;
+    nleft=nbytes;
+
+    while(nleft>0){
+        nwritten=write(fd,request,nleft);
+        if(nwritten<=0)/*error*/exit(1);
+        nleft-=nwritten;
+        request+=nwritten;
+    }
+
+    nleft=nbytes;
+
+    while(nleft>0){
+        nread=read(fd,response,nleft);
+        if(nread==-1)/*error*/exit(1);
+        else if(nread==0)break;//closed by peer
+        nleft-=nread;
+        response+=nread;
+    }
+    nread=nbytes-nleft;
+
+    // Cleanup
+    freeaddrinfo(res);
+    close(fd);
+
+    return 0;
 }
 
 int startCmd(char *arguments,char* GSIP, char* GSport,int &PLID, int &max_playtime){
