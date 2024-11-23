@@ -83,7 +83,7 @@ int main() {
             }
         }
         else if(!strncmp(buffer,"QUIT",3)){
-            n = sendto(fd, "RQT OK", 6, 0, (struct sockaddr *)&addr, addrlen);
+            n = sendto(fd, "RQT OK\n", 7, 0, (struct sockaddr *)&addr, addrlen);
             if (n == -1) {
                 perror("sendto");
                 exit(1);

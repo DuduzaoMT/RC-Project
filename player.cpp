@@ -90,7 +90,7 @@ int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
 
     while (message_received == 0){
         // Send message to server
-        send = sendto(fd, request, strlen(request)+1, 0, res->ai_addr, res->ai_addrlen);
+        send = sendto(fd, request, strlen(request), 0, res->ai_addr, res->ai_addrlen);
         if (send == -1) {
             perror("sendto");
             exit(1);
@@ -153,7 +153,7 @@ int TCPInteraction(char* request,char* response, char* GSIP, char* GSport){
         exit(1);
     }
 
-    nbytes=strlen(request)+1;
+    nbytes=strlen(request);
     nleft=nbytes;
 
     while(nleft>0){
@@ -181,7 +181,7 @@ int TCPInteraction(char* request,char* response, char* GSIP, char* GSport){
     return 0;
 }
 
-int startCmd(char *arguments,char* GSIP, char* GSport,int &PLID, int &max_playtime){
+int startCmd(char *arguments,char* GSIP, char* GSport,int *PLID, int *max_playtime,int *trial_number){
 
     char PLID_buffer[USERINPUTBUFFER], max_playtime_buffer[USERINPUTBUFFER];
     char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
@@ -193,7 +193,7 @@ int startCmd(char *arguments,char* GSIP, char* GSport,int &PLID, int &max_playti
     sscanf(arguments, "%s %s", PLID_buffer, max_playtime_buffer);
 
     if (strlen(PLID_buffer) == 6 && isNumber(PLID_buffer))
-        PLID = atoi(PLID_buffer);
+        (*PLID) = atoi(PLID_buffer);
         
     else{
         fprintf(stderr, "Invalid PLID\n");
@@ -202,28 +202,29 @@ int startCmd(char *arguments,char* GSIP, char* GSport,int &PLID, int &max_playti
     
     
     if (isNumber(max_playtime_buffer)){
-        max_playtime = atoi(max_playtime_buffer);
-        if (max_playtime <= 0 || max_playtime > 600){
+        (*max_playtime) = atoi(max_playtime_buffer);
+        if ((*max_playtime) <= 0 || (*max_playtime) > 600){
             fprintf(stderr, "Invalid max_playtime\n");
             return ERRO;
         }
     }
 
-    sprintf(request,"SNG %06d %03d\n",PLID,max_playtime);
+    sprintf(request,"SNG %06d %03d\n",(*PLID),(*max_playtime));
 
     // Exibição da resposta do servidor
     UDPInteraction(request,response, GSIP,GSport);
     if(!strcmp(response,"RSG OK\n")){
-        fprintf(stdout,"New Game started (max %d sec)\n", max_playtime);
+        fprintf(stdout,"New Game started (max %d sec)\n", (*max_playtime));
     }
     else if(!strcmp(response,"RSG NOK\n")){
-        fprintf(stdout,"The player with PLID:%06d has an ongoing game", PLID);
+        fprintf(stdout,"The player with PLID:%06d has an ongoing game", (*PLID));
         return ERRO;
     }
     else{
         fprintf(stderr, "Connection Lost\n");
         return ERRO;
     }
+    (*trial_number) = 1;
 
     // TODO - Inicializar o timer/cronometro
     return FALSE;
@@ -305,7 +306,7 @@ int quitCmd(char* GSIP, char* GSport,int PLID){
     char C1,C2,C3,C4;
     char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
 
-    sprintf(request,"QUIT %06d\n",PLID);
+    sprintf(request,"QUT %06d\n",PLID);
 
     UDPInteraction(request,response, GSIP,GSport);
 
@@ -314,8 +315,8 @@ int quitCmd(char* GSIP, char* GSport,int PLID){
         fprintf(stdout,"Secret Key was: %c %c %c %c\n", C1,C2,C3,C4);
     }
     // PLID not have an ongoing game
-    else if(!strncmp(response,"RTR NOK",7)){
-        fprintf(stdout,"PLID %06d did not have an ongoing game\n", PLID);
+    else if(!strncmp(response,"RQT NOK",7)){
+        fprintf(stdout,"There`s not an ongoing game\n");
     }
     else{
         fprintf(stderr, "Connection Lost\n");
@@ -325,7 +326,21 @@ int quitCmd(char* GSIP, char* GSport,int PLID){
 }
 
 int exitCmd(char* GSIP, char* GSport,int PLID){
-    quitCmd(GSIP,GSport,PLID);
+    char C1,C2,C3,C4;
+    char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
+
+    sprintf(request,"QUT %06d\n",PLID);
+
+    UDPInteraction(request,response, GSIP,GSport);
+
+    if(!strncmp(response,"RQT OK",6) ){
+        sscanf(response,"RQT OK %c %c %c %c\n",&C1,&C2,&C3,&C4);
+        fprintf(stdout,"Secret Key was: %c %c %c %c\n", C1,C2,C3,C4);
+    }
+    else if (!strncmp(response,"RQT ERR",6)){
+        fprintf(stderr, "Connection Lost\n");
+        return ERRO;
+    }
     return TRUE;
 }
 
@@ -376,7 +391,7 @@ int main(int argc, char **argv) {
 
             // commands with arguments
             if (!strcmp(command, "start")){
-                if (startCmd(arguments,GSIP,GSport,PLID,max_playtime) == ERRO)
+                if (startCmd(arguments,GSIP,GSport,&PLID,&max_playtime,&trial_number) == ERRO)
                     fprintf(stderr, "Command error\n");
             }
             else if(!strcmp(command,"try")){
