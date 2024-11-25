@@ -234,7 +234,7 @@ int startCmd(char *arguments,char* GSIP, char* GSport,int *PLID, int *max_playti
 
 
     // TODO - Inicializar o timer/cronometro
-    return FALSE;
+    return false;
 }
 
 int tryCmd(char *arguments,char* GSIP, char* GSport, int* trial_number, int PLID){
@@ -307,7 +307,7 @@ int tryCmd(char *arguments,char* GSIP, char* GSport, int* trial_number, int PLID
     else
         return ERROR;
     
-    return FALSE; 
+    return false; 
 }
 
 int quitCmd(char* GSIP, char* GSport,int PLID){
@@ -331,7 +331,7 @@ int quitCmd(char* GSIP, char* GSport,int PLID){
     else
         return ERROR;
     
-    return FALSE;
+    return false;
 }
 
 int exitCmd(char* GSIP, char* GSport,int PLID){
@@ -349,7 +349,7 @@ int exitCmd(char* GSIP, char* GSport,int PLID){
     else if (!strncmp(response,"RQT ERR",6))
         return ERROR;
     
-    return TRUE;
+    return true;
 }
 
 int showTrialsCmd(char* GSIP, char* GSport,int PLID){
@@ -416,7 +416,7 @@ int debugCmd(char *arguments,char* GSIP, char* GSport,int *PLID, int *max_playti
 
 
     // TODO - Inicializar o timer/cronometro
-    return FALSE;
+    return false;
 }
 
 int main(int argc, char **argv) {
@@ -425,7 +425,7 @@ int main(int argc, char **argv) {
     char GSport[MAXPORTSIZE] = PORT;
 
     int trial_number = 1;
-    int exit_application = FALSE;
+    int exit_application = false;
     int PLID = UNKNOWN;
     int max_playtime = UNKNOWN;
 
@@ -455,7 +455,7 @@ int main(int argc, char **argv) {
     
     // Player controller
 
-    while (exit_application != TRUE)
+    while (exit_application != true)
     {
         printf("-----\nPLID atual: %d\ntrial_number atual: %d\nmax_playtime atual: %d\n-----\n", PLID, trial_number, max_playtime);
 
