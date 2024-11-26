@@ -69,55 +69,80 @@ int verifyArg(char **user_args, int idx, const char *prefix, char *arg_to_change
 // Full UDP connection
 int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
 
-    int fd, errcode, argValid,message_received=0;
+    int fd, errcode, argValid;
+    fd_set set;
+    timeval timeout;
     ssize_t send,rec;
     socklen_t addrlen;
-    struct addrinfo hints, *res;
+    struct addrinfo hints, *server_info, *client_info;
 
     // UDP socket creation
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) {
         perror("socket");
-        exit(1);
+        return 1;
     }
 
-    // Server info configuration
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;       // IPv4
     hints.ai_socktype = SOCK_DGRAM;  // Socket UDP
 
-    errcode = getaddrinfo(GSIP, GSport, &hints, &res);
+    // Client info configuration
+    errcode = getaddrinfo(NULL, GSport, &hints, &client_info);
     if (errcode != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(errcode));
-        exit(1);
+        close(fd);
+        return 1;
     }
 
-    while (message_received == 0){
-        // Send message to server
-        printf("[UDP request]: .%s.\n",request);
-        send = sendto(fd, request, strlen(request), 0, res->ai_addr, res->ai_addrlen);
-        if (send == -1) {
-            perror("sendto");
-            exit(1);
-        }
-
-        // Receive message from server
-        addrlen = sizeof(struct sockaddr_in);
-        rec = recvfrom(fd, response, 128, 0, (struct sockaddr *)res->ai_addr, &addrlen);
-        printf("[UDP response]: .%s.\n",response);
-
-        // TODO - associar um timer para esperar no max 3 segundos pela resposta do servidor
-
-        if (rec == -1)
-        {
-            perror("recvfrom");
-            exit(1);
-        }
-        if (rec > 0)
-            message_received = 1;
-
+    // Server info configuration
+    errcode = getaddrinfo(GSIP, GSport, &hints, &server_info);
+    if (errcode != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(errcode));
+        return 1;
     }
-    freeaddrinfo(res);
+
+    // Send message to server
+    printf("[UDP request]: .%s.\n",request);
+    send = sendto(fd, request, strlen(request), 0, server_info->ai_addr, server_info->ai_addrlen);
+    if (send == -1) {
+        perror("sendto");
+        return 1;
+    }
+
+    // Receive message from server
+    fd_set read_fds;
+    FD_ZERO(&read_fds);
+    FD_SET(fd, &read_fds);
+    timeout.tv_sec = 5;
+
+    int ready = select(fd + 1, &read_fds, nullptr, nullptr, &timeout);
+    if (ready < 0) {
+        perror("select");
+        close(fd);
+        return 1;
+    } else if (ready == 0) {
+        fprintf(stderr, "No data received\n");
+        return 1;
+    } else if (FD_ISSET(fd, &read_fds)) {
+        // Data is available to read
+        sockaddr_in recv_addr;
+        socklen_t recv_len = sizeof(recv_addr);
+        ssize_t received = recvfrom(fd, response, 128, 0,
+                                    (struct sockaddr*)&recv_addr, &recv_len);
+
+        if (received > 0) {
+            response[received] = '\0';
+        } else {
+            fprintf(stderr, "No data received\n");
+            return 1;
+        }
+    }
+
+    printf("[UDP response]: .%s.\n",response);
+
+    freeaddrinfo(server_info);
+    freeaddrinfo(client_info);
     close(fd);
     return 0;
 }
@@ -135,7 +160,7 @@ int TCPInteraction(char* request,char* response, char* GSIP, char* GSport){
     fd = socket(AF_INET, SOCK_STREAM, 0); // TCP socket
     if (fd == -1) {
         perror("Socket creation failed");
-        exit(1);
+        return 1;
     }
 
     // Initialize the hints structure
@@ -147,7 +172,7 @@ int TCPInteraction(char* request,char* response, char* GSIP, char* GSport){
     errcode = getaddrinfo(GSIP, GSport, &hints, &res);
     if (errcode != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(errcode));
-        exit(1);
+        return 1;
     }
 
     // Connect to the server
@@ -156,7 +181,7 @@ int TCPInteraction(char* request,char* response, char* GSIP, char* GSport){
         perror("Connection failed");
         freeaddrinfo(res);
         close(fd);
-        exit(1);
+        return 1;
     }
 
     nbytes=strlen(request);
@@ -165,7 +190,7 @@ int TCPInteraction(char* request,char* response, char* GSIP, char* GSport){
     while(nleft>0){
         printf("[TCP request]: .%s.\n",request);
         nwritten=write(fd,request,nleft);
-        if(nwritten<=0)/*error*/exit(1);
+        if(nwritten<=0)/*error*/return 1;
         nleft-=nwritten;
         request+=nwritten;
     }
@@ -178,7 +203,7 @@ int TCPInteraction(char* request,char* response, char* GSIP, char* GSport){
     while(nleft>0){
         nread=read(fd,response,nleft);
         printf("[TCP response]: .%s.\n",response);
-        if(nread==-1)/*error*/exit(1);
+        if(nread==-1)/*error*/return 1;
         else if(nread==0)break;//closed by peer
         nleft-=nread;
         response+=nread;
