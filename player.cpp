@@ -21,7 +21,7 @@ using namespace std;
 #define GSPORTPREFIX "-p\0"     // Gsport's prefix
 
 #define USERINPUTBUFFER 128     // Buffer to store user input
-#define GENERALSIZEBUFFER 128   // General size to auxiliar buffers
+#define GENERALSIZEBUFFER 2048   // General size to auxiliar buffers
 
 #define MAX_PLAYTIME "600"        // Maximum played time
 
@@ -94,6 +94,7 @@ int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
 
     while (message_received == 0){
         // Send message to server
+        printf("[UDP request]: .%s.\n",request);
         send = sendto(fd, request, strlen(request), 0, res->ai_addr, res->ai_addrlen);
         if (send == -1) {
             perror("sendto");
@@ -103,6 +104,7 @@ int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
         // Receive message from server
         addrlen = sizeof(struct sockaddr_in);
         rec = recvfrom(fd, response, 128, 0, (struct sockaddr *)res->ai_addr, &addrlen);
+        printf("[UDP response]: .%s.\n",response);
 
         // TODO - associar um timer para esperar no max 3 segundos pela resposta do servidor
 
@@ -161,22 +163,26 @@ int TCPInteraction(char* request,char* response, char* GSIP, char* GSport){
     nleft=nbytes;
 
     while(nleft>0){
+        printf("[TCP request]: .%s.\n",request);
         nwritten=write(fd,request,nleft);
         if(nwritten<=0)/*error*/exit(1);
         nleft-=nwritten;
         request+=nwritten;
     }
+    char file_name[128];
+    int bytes;
+    bool first = true;
 
-    nleft=nbytes;
+    nleft = 2048;
 
     while(nleft>0){
         nread=read(fd,response,nleft);
+        printf("[TCP response]: .%s.\n",response);
         if(nread==-1)/*error*/exit(1);
         else if(nread==0)break;//closed by peer
         nleft-=nread;
         response+=nread;
     }
-    nread=nbytes-nleft;
 
     // Cleanup
     freeaddrinfo(res);
@@ -218,11 +224,11 @@ int startCmd(char *arguments,char* GSIP, char* GSport,int *PLID, int *max_playti
 
     // Exibição da resposta do servidor
     UDPInteraction(request,response, GSIP,GSport);
-    if(!strcmp(response,"RSG OK\n")){
+    if(!strncmp(response,"RSG OK\n",7)){
         fprintf(stdout,"New Game started (max %d sec)\n", new_max_playtime);
     }
-    else if(!strcmp(response,"RSG NOK\n")){
-        fprintf(stdout,"The player with PLID:%06d has an ongoing game", (*PLID));
+    else if(!strncmp(response,"RSG NOK\n",8)){
+        fprintf(stdout,"The player with PLID:%06d has an ongoing game\n", (*PLID));
         return ERROR;
     }
     else
@@ -234,7 +240,7 @@ int startCmd(char *arguments,char* GSIP, char* GSport,int *PLID, int *max_playti
 
 
     // TODO - Inicializar o timer/cronometro
-    return false;
+    return FALSE;
 }
 
 int tryCmd(char *arguments,char* GSIP, char* GSport, int* trial_number, int PLID){
@@ -354,14 +360,17 @@ int exitCmd(char* GSIP, char* GSport,int PLID){
 
 int showTrialsCmd(char* GSIP, char* GSport,int PLID){
 
-    char request[GENERALSIZEBUFFER], response[80000];
+    char request[GENERALSIZEBUFFER], response[128];
 
     sprintf(request,"STR %06d\n",PLID);
 
     TCPInteraction(request,response, GSIP,GSport);
 
-    printf("%s\n", response);
+    printf("----SHOWTRIALS----\n");
 
+    printf("%s",response);
+
+    printf("----SHOWTRIALS----\n");
     return 0;
 
 }
