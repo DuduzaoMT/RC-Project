@@ -116,7 +116,7 @@ int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
     FD_SET(fd, &read_fds);
     timeout.tv_sec = 5;
 
-    int ready = select(fd + 1, &read_fds, nullptr, nullptr, &timeout);
+    int ready = select(FD_SETSIZE, &read_fds, NULL, NULL, &timeout);
     if (ready < 0) {
         perror("select");
         close(fd);
