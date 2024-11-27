@@ -70,7 +70,7 @@ int verifyArg(char **user_args, int idx, const char *prefix, char *arg_to_change
 int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
 
     int fd, errcode, argValid;
-    fd_set set;
+    fd_set read_fds;
     timeval timeout;
     ssize_t send,rec;
     socklen_t addrlen;
@@ -111,12 +111,12 @@ int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
     }
 
     // Receive message from server
-    fd_set read_fds;
     FD_ZERO(&read_fds);
     FD_SET(fd, &read_fds);
     timeout.tv_sec = 5;
+    timeout.tv_usec = 0;
 
-    int ready = select(FD_SETSIZE, &read_fds, NULL, NULL, &timeout);
+    int ready = select(FD_SETSIZE, &read_fds, (fd_set *)NULL,(fd_set *)NULL, &timeout);
     if (ready < 0) {
         perror("select");
         close(fd);
@@ -385,7 +385,7 @@ int exitCmd(char* GSIP, char* GSport,int PLID){
 
 int showTrialsCmd(char* GSIP, char* GSport,int PLID){
 
-    char request[GENERALSIZEBUFFER], response[128];
+    char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
 
     sprintf(request,"STR %06d\n",PLID);
 
@@ -396,6 +396,23 @@ int showTrialsCmd(char* GSIP, char* GSport,int PLID){
     printf("%s",response);
 
     printf("----SHOWTRIALS----\n");
+    return 0;
+
+}
+
+int scoreBoard(char* GSIP, char* GSport){
+
+    char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
+
+    sprintf(request,"SSB\n");
+
+    TCPInteraction(request,response, GSIP,GSport);
+
+    printf("----SSB----\n");
+
+    printf("%s",response);
+
+    printf("----SSB----\n");
     return 0;
 
 }
@@ -521,6 +538,7 @@ int main(int argc, char **argv) {
             }
             // commands without arguments  
             else if (!strcmp(command, "sb") || !strcmp(command,"scoreboard")){
+                scoreBoard(GSIP,GSport);
             }
 
             else if (!strcmp(command, "st") || !strcmp(command,"show_trials")){
