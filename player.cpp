@@ -155,6 +155,7 @@ int TCPInteraction(char* request,char* response, char* GSIP, char* GSport){
     socklen_t addrlen;
     struct addrinfo hints, *res;
     struct sockaddr_in addr;
+    char buffer[GENERALSIZEBUFFER];
 
     // Create the socket
     fd = socket(AF_INET, SOCK_STREAM, 0); // TCP socket
@@ -188,7 +189,7 @@ int TCPInteraction(char* request,char* response, char* GSIP, char* GSport){
     nleft=nbytes;
 
     while(nleft>0){
-        printf("[TCP request]: .%s.\n",request);
+        printf("[TCP request]: ( %s )\n",request);
         nwritten=write(fd,request,nleft);
         if(nwritten<=0)/*error*/return 1;
         nleft-=nwritten;
@@ -200,12 +201,16 @@ int TCPInteraction(char* request,char* response, char* GSIP, char* GSport){
 
     nleft = 2048;
 
+    memset(response, 0, sizeof(response));
+
     while(nleft>0){
-        nread=read(fd,response,nleft);
-        printf("[TCP response]: .%s.\n",response);
+        nread=read(fd,buffer,nleft);
         if(nread==-1)/*error*/return 1;
         else if(nread==0)break;//closed by peer
+        buffer[nread] = '\0';
+        printf("[TCP response]: ( %s )\n",buffer);
         nleft-=nread;
+        strcpy(response, buffer);
         response+=nread;
     }
 
@@ -369,17 +374,20 @@ int exitCmd(char* GSIP, char* GSport,int PLID){
     char C1,C2,C3,C4;
     char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
 
-    sprintf(request,"QUT %06d\n",PLID);
+    if(PLID != -1){
 
-    UDPInteraction(request,response, GSIP,GSport);
+        sprintf(request,"QUT %06d\n",PLID);
 
-    if(!strncmp(response,"RQT OK",6) ){
-        sscanf(response,"RQT OK %c %c %c %c\n",&C1,&C2,&C3,&C4);
-        fprintf(stdout,"Secret Key was: %c %c %c %c\n", C1,C2,C3,C4);
+        UDPInteraction(request,response, GSIP,GSport);
+
+        if(!strncmp(response,"RQT OK",6) ){
+            sscanf(response,"RQT OK %c %c %c %c\n",&C1,&C2,&C3,&C4);
+            fprintf(stdout,"Secret Key was: %c %c %c %c\n", C1,C2,C3,C4);
+        }
+        else if (!strncmp(response,"RQT ERR",6))
+            return ERROR;
+     
     }
-    else if (!strncmp(response,"RQT ERR",6))
-        return ERROR;
-    
     return true;
 }
 
