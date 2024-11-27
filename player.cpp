@@ -327,9 +327,16 @@ int tryCmd(char *arguments,char* GSIP, char* GSport, int* trial_number, int PLID
     else if(!strncmp(response,"RTR DUP",7)){
         fprintf(stdout,"Secret Key guess repeats a previous trial`s guess: nB = %d, nW=%d\n",nB,nW);
     }
+    // Invalid trial number 
+    else if(!strncmp(response,"RTR INV",7)){
+        sscanf(response,"RTR INV %d %d %d\n",&r_trial_number,&nB,&nW);
+        fprintf(stderr,"Invalid trial number\n");
+        (*trial_number) = r_trial_number+1;
+        return ERROR;
+    }
     //(invalid PLID - not having an ongoing game f.e.)
-    else if(!strncmp(response,"RTR NOK",7) || PLID == UNKNOWN){
-        fprintf(stderr,"Out of context (probabily there is not an ongoing game)\n");
+    else if(!strncmp(response,"RTR NOK",7)){
+        fprintf(stderr,"Out of context\n");
         return ERROR;
     }
     // no more attemps available
