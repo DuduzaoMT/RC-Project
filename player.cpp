@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fcntl.h>
 #include <vector>
 #include <cstring>
 #include <stdio.h>
@@ -189,7 +190,7 @@ int TCPInteraction(char* request,char* response, char* GSIP, char* GSport){
     nleft=nbytes;
 
     while(nleft>0){
-        printf("[TCP request]: ( %s )\n",request);
+        printf("[TCP request]: %s\n",request);
         nwritten=write(fd,request,nleft);
         if(nwritten<=0)/*error*/return 1;
         nleft-=nwritten;
@@ -253,7 +254,9 @@ int startCmd(char *arguments,char* GSIP, char* GSport,int *PLID, int *max_playti
     sprintf(request,"SNG %06d %03d\n",new_PLID,new_max_playtime);
 
     // Exibição da resposta do servidor
-    UDPInteraction(request,response, GSIP,GSport);
+    if (UDPInteraction(request,response, GSIP,GSport))
+        return ERROR;
+    
     if(!strncmp(response,"RSG OK\n",7)){
         fprintf(stdout,"New Game started (max %d sec)\n", new_max_playtime);
     }
@@ -309,7 +312,8 @@ int tryCmd(char *arguments,char* GSIP, char* GSport, int* trial_number, int PLID
     sprintf(request,"TRY %06d %c %c %c %c %d\n",PLID,C1,C2,C3,C4,(*trial_number));
 
     // Exibição da resposta do servidor
-    UDPInteraction(request,response, GSIP,GSport);
+    if (UDPInteraction(request,response, GSIP,GSport))
+        return ERROR;
     
     if(!strncmp(response,"RTR OK",6) ){
         sscanf(response,"RTR OK %d %d %d\n",&r_trial_number,&nB,&nW);
@@ -353,7 +357,8 @@ int quitCmd(char* GSIP, char* GSport,int PLID){
 
     sprintf(request,"QUT %06d\n",PLID);
 
-    UDPInteraction(request,response, GSIP,GSport);
+    if (UDPInteraction(request,response, GSIP,GSport))
+        return ERROR;
 
     if(!strncmp(response,"RQT OK",6) ){
         sscanf(response,"RQT OK %c %c %c %c\n",&C1,&C2,&C3,&C4);
@@ -378,7 +383,8 @@ int exitCmd(char* GSIP, char* GSport,int PLID){
 
         sprintf(request,"QUT %06d\n",PLID);
 
-        UDPInteraction(request,response, GSIP,GSport);
+        if (UDPInteraction(request,response, GSIP,GSport))
+            return ERROR;
 
         if(!strncmp(response,"RQT OK",6) ){
             sscanf(response,"RQT OK %c %c %c %c\n",&C1,&C2,&C3,&C4);
@@ -393,34 +399,98 @@ int exitCmd(char* GSIP, char* GSport,int PLID){
 
 int showTrialsCmd(char* GSIP, char* GSport,int PLID){
 
-    char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
+    char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER], f_name[USERINPUTBUFFER], *f_data,
+         f_size_buffer[USERINPUTBUFFER], status[USERINPUTBUFFER];
 
     sprintf(request,"STR %06d\n",PLID);
 
-    TCPInteraction(request,response, GSIP,GSport);
+    if (TCPInteraction(request,response, GSIP,GSport))
+        return ERROR;
+    
+    if (!strncmp(response,"ERR",3)){
+        fprintf(stderr, "Error\n");
+        return ERROR;
+    }
 
-    printf("----SHOWTRIALS----\n");
+    if (!strncmp(response,"RST NOK",7)){
+        fprintf(stderr, "No game found\n");
+        return 0;
+    }
 
-    printf("%s",response);
+    if (!strncmp(response,"RST ACT",7) || !strncmp(response,"RST FIN",7)){
+        sscanf(response,"RST %s %s %s ", status, f_name, f_size_buffer);
 
-    printf("----SHOWTRIALS----\n");
+        f_data = (char*)malloc(atoi(f_size_buffer) * sizeof(char));
+
+        strcpy(f_data, response+8+strlen(f_name)+1+strlen(f_size_buffer)+1);
+
+        printf("%s",f_data);
+
+        free(f_data);
+    }
+
+    if (!strcmp(status, "FIN"))
+        return RESTART;
+    
     return 0;
 
 }
 
 int scoreBoard(char* GSIP, char* GSport){
 
-    char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
+    char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER], f_name[USERINPUTBUFFER], *f_data,
+         f_size_buffer[USERINPUTBUFFER];
+
+    int sb_fd;
+
+    ssize_t bytes_written;
 
     sprintf(request,"SSB\n");
 
-    TCPInteraction(request,response, GSIP,GSport);
+    if (TCPInteraction(request,response,GSIP,GSport))
+        return ERROR;
 
-    printf("----SSB----\n");
+    if (!strncmp(response,"ERR",3)){
+        fprintf(stderr, "Error\n");
+        return ERROR;
+    }
 
-    printf("%s",response);
+    if (!strncmp(response,"RSS EMPTY",8)){
+        fprintf(stderr, "No player has won yet\n");
+        return 0;
+    }
 
-    printf("----SSB----\n");
+    if (!strncmp(response,"RSS OK",6)){
+        sscanf(response,"RSS OK %s %s ", f_name, f_size_buffer);
+
+        f_data = (char*)malloc(atoi(f_size_buffer) * sizeof(char));
+
+        strcpy(f_data, response+7+strlen(f_name)+1+strlen(f_size_buffer)+2);
+
+        printf("%s",f_data);
+
+        sb_fd = open(f_name, O_WRONLY | O_CREAT | O_TRUNC, 0777);
+
+        if (sb_fd < 0)
+        {
+            free(f_data);
+            fprintf(stderr, "Couldn't create file\n");
+            return ERROR;
+        }
+
+        bytes_written = write(sb_fd, f_data, strlen(f_data));
+        if (bytes_written < 0)
+        {
+            free(f_data);
+            close(sb_fd);
+            fprintf(stderr, "Couldn't write to file\n");
+            return ERROR;
+        }
+        
+        close(sb_fd);
+        free(f_data);
+    }
+    
     return 0;
 
 }
@@ -457,13 +527,14 @@ int debugCmd(char *arguments,char* GSIP, char* GSport,int *PLID, int *max_playti
     sprintf(request,"DBG %06d %03d %c %c %c %c\n",new_PLID,new_max_playtime, C1, C2, C3, C4);
 
     // Exibição da resposta do servidor
-    UDPInteraction(request,response, GSIP,GSport);
+    if (UDPInteraction(request,response, GSIP,GSport))
+        return ERROR;
 
     if(!strcmp(response,"RDB OK\n")){
         fprintf(stdout,"New Game started (max %d sec)\n", new_max_playtime);
     }
     else if(!strcmp(response,"RDB NOK\n")){
-        fprintf(stdout,"The player with PLID:%06d has an ongoing game", (*PLID));
+        fprintf(stdout,"The player with PLID:%06d has an ongoing game", new_PLID);
         return ERROR;
     }
     else
@@ -473,8 +544,6 @@ int debugCmd(char *arguments,char* GSIP, char* GSport,int *PLID, int *max_playti
     (*PLID) = new_PLID;
     (*max_playtime) = new_max_playtime;
 
-
-    // TODO - Inicializar o timer/cronometro
     return false;
 }
 
@@ -516,7 +585,7 @@ int main(int argc, char **argv) {
 
     while (exit_application != true)
     {
-        printf("-----\nPLID atual: %d\ntrial_number atual: %d\nmax_playtime atual: %d\n-----\n", PLID, trial_number, max_playtime);
+        //printf("-----\nPLID atual: %d\ntrial_number atual: %d\nmax_playtime atual: %d\n-----\n", PLID, trial_number, max_playtime);
 
         char command[USERINPUTBUFFER], arguments[USERINPUTBUFFER];
         scanf("%s", command);
@@ -546,11 +615,20 @@ int main(int argc, char **argv) {
             }
             // commands without arguments  
             else if (!strcmp(command, "sb") || !strcmp(command,"scoreboard")){
-                scoreBoard(GSIP,GSport);
+                command_status = scoreBoard(GSIP,GSport);
+                if (command_status == ERROR)
+                    fprintf(stderr, "Scoreboard command error\n");
             }
 
             else if (!strcmp(command, "st") || !strcmp(command,"show_trials")){
-                showTrialsCmd(GSIP,GSport,PLID);
+                command_status = showTrialsCmd(GSIP,GSport,PLID);
+                if (command_status == ERROR)
+                    fprintf(stderr, "Show trials command error\n");
+                else if (command_status == RESTART){
+                    PLID = UNKNOWN;
+                    trial_number = 1;
+                    max_playtime = UNKNOWN;
+                }
             }
 
             else if (!strcmp(command, "quit")){
