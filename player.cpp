@@ -22,9 +22,11 @@ using namespace std;
 #define GSPORTPREFIX "-p\0"     // Gsport's prefix
 
 #define USERINPUTBUFFER 128     // Buffer to store user input
-#define GENERALSIZEBUFFER 2048   // General size to auxiliar buffers
+#define GENERALSIZEBUFFER 2048  // General size to auxiliar buffers
 
-#define MAX_PLAYTIME "600"        // Maximum played time
+#define MAX_PLAYTIME "600"      // Maximum played time
+
+#define CONNECTIONATTEMPS 2     // Number of UDP connection attemps
 
 // Commands
 #define STARTCMD "start\0"      
@@ -77,67 +79,72 @@ int UDPInteraction(char* request,char* response, char* GSIP, char* GSport){
     socklen_t addrlen;
     struct addrinfo hints, *server_info, *client_info;
 
-    // UDP socket creation
-    fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (fd == -1) {
-        perror("socket");
-        return 1;
-    }
-
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_INET;       // IPv4
-    hints.ai_socktype = SOCK_DGRAM;  // Socket UDP
-
-    // Client info configuration
-    errcode = getaddrinfo(NULL, GSport, &hints, &client_info);
-    if (errcode != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(errcode));
-        close(fd);
-        return 1;
-    }
-
-    // Server info configuration
-    errcode = getaddrinfo(GSIP, GSport, &hints, &server_info);
-    if (errcode != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(errcode));
-        return 1;
-    }
-
-    // Send message to server
-    printf("[UDP request]: .%s.\n",request);
-    send = sendto(fd, request, strlen(request), 0, server_info->ai_addr, server_info->ai_addrlen);
-    if (send == -1) {
-        perror("sendto");
-        return 1;
-    }
-
-    // Receive message from server
-    FD_ZERO(&read_fds);
-    FD_SET(fd, &read_fds);
-    timeout.tv_sec = 5;
-    timeout.tv_usec = 0;
-
-    int ready = select(FD_SETSIZE, &read_fds, (fd_set *)NULL,(fd_set *)NULL, &timeout);
-    if (ready < 0) {
-        perror("select");
-        close(fd);
-        return 1;
-    } else if (ready == 0) {
-        fprintf(stderr, "No data received\n");
-        return 1;
-    } else if (FD_ISSET(fd, &read_fds)) {
-        // Data is available to read
-        sockaddr_in recv_addr;
-        socklen_t recv_len = sizeof(recv_addr);
-        ssize_t received = recvfrom(fd, response, 128, 0,
-                                    (struct sockaddr*)&recv_addr, &recv_len);
-
-        if (received > 0) {
-            response[received] = '\0';
-        } else {
-            fprintf(stderr, "No data received\n");
+    // Send and receive messages
+    int n_attempts = CONNECTIONATTEMPS;
+    while (n_attempts > 0)
+    {
+            // UDP socket creation
+        fd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (fd == -1) {
+            perror("socket");
             return 1;
         }
+
+        memset(&hints, 0, sizeof hints);
+        hints.ai_family = AF_INET;       // IPv4
+        hints.ai_socktype = SOCK_DGRAM;  // Socket UDP
+
+        // Client info configuration
+        errcode = getaddrinfo(NULL, GSport, &hints, &client_info);
+        if (errcode != 0) {
+            fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(errcode));
+            close(fd);
+            return 1;
+        }
+
+        // Server info configuration
+        errcode = getaddrinfo(GSIP, GSport, &hints, &server_info);
+        if (errcode != 0) {
+            fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(errcode));
+            return 1;
+        }
+        // Send message to server
+        printf("[UDP request]: .%s.\n",request);
+        send = sendto(fd, request, strlen(request), 0, server_info->ai_addr, server_info->ai_addrlen);
+        if (send == -1) {
+            perror("sendto");
+            return 1;
+        }
+        
+        // Receive message from server
+        FD_ZERO(&read_fds);
+        FD_SET(fd, &read_fds);
+        timeout.tv_sec = 3;
+        timeout.tv_usec = 0;
+
+        int ready = select(FD_SETSIZE, &read_fds, (fd_set *)NULL,(fd_set *)NULL, &timeout);
+        if (ready < 0) {
+            perror("select");
+            close(fd);
+            return 1;
+        } else if (ready == 0) {
+            fprintf(stderr, "No data received\n");
+            close(fd);
+        } else if (FD_ISSET(fd, &read_fds)) {
+            // Data is available to read
+            sockaddr_in recv_addr;
+            socklen_t recv_len = sizeof(recv_addr);
+            ssize_t received = recvfrom(fd, response, 128, 0,
+                                        (struct sockaddr*)&recv_addr, &recv_len);
+
+            if (received > 0) {
+                response[received] = '\0';
+                break;
+            } else {
+                fprintf(stderr, "No data received\n");
+            }
+        }
+        n_attempts--;
     }
 
     printf("[UDP response]: .%s.\n",response);
@@ -261,7 +268,7 @@ int startCmd(char *arguments,char* GSIP, char* GSport,int *PLID, int *max_playti
         fprintf(stdout,"New Game started (max %d sec)\n", new_max_playtime);
     }
     else if(!strncmp(response,"RSG NOK\n",8)){
-        fprintf(stdout,"The player with PLID:%06d has an ongoing game\n", (*PLID));
+        fprintf(stdout,"The player with PLID:%06d has an ongoing game\n", new_PLID);
         return ERROR;
     }
     else
@@ -271,8 +278,6 @@ int startCmd(char *arguments,char* GSIP, char* GSport,int *PLID, int *max_playti
     (*PLID) = new_PLID;
     (*max_playtime) = new_max_playtime;
 
-
-    // TODO - Inicializar o timer/cronometro
     return FALSE;
 }
 
@@ -309,7 +314,8 @@ int tryCmd(char *arguments,char* GSIP, char* GSport, int* trial_number, int PLID
         return ERROR;
     }
 
-    sprintf(request,"TRY %06d %c %c %c %c %d\n",PLID,C1,C2,C3,C4,(*trial_number));
+    printf("trial_number: %d\n", *trial_number);
+    sprintf(request,"TRY %06d %c %c %c %c %d\n",PLID,C1,C2,C3,C4,4);
 
     // Exibição da resposta do servidor
     if (UDPInteraction(request,response, GSIP,GSport))
@@ -329,9 +335,7 @@ int tryCmd(char *arguments,char* GSIP, char* GSport, int* trial_number, int PLID
     }
     // Invalid trial number 
     else if(!strncmp(response,"RTR INV",7)){
-        sscanf(response,"RTR INV %d %d %d\n",&r_trial_number,&nB,&nW);
         fprintf(stderr,"Invalid trial number\n");
-        (*trial_number) = r_trial_number+1;
         return ERROR;
     }
     //(invalid PLID - not having an ongoing game f.e.)
