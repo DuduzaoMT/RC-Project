@@ -229,6 +229,7 @@ int TCPInteraction(char *request, char *response, char *GSIP, char *GSport)
     nleft = 2048;
 
     memset(response, 0, sizeof(response));
+    char *last_digit_pointer = response;
 
     while (nleft > 0)
     {
@@ -238,10 +239,10 @@ int TCPInteraction(char *request, char *response, char *GSIP, char *GSport)
         else if (nread == 0)
             break; // closed by peer
         buffer[nread] = '\0';
-        printf("[TCP response]: ( %s )\n", buffer);
+        printf("[TCP response]: .%s.\n", buffer);
         nleft -= nread;
-        strcpy(response, buffer);
-        response += nread;
+        strcpy(last_digit_pointer, buffer);
+        last_digit_pointer += nread;
     }
 
     // Cleanup
