@@ -1,47 +1,7 @@
-#include <iostream>
-#include <fcntl.h>
-#include <vector>
-#include <cstring>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <arpa/inet.h>
+#include "common.h"
+#include "player.h"
 
 using namespace std;
-
-#define MAXPORTSIZE 6         // Maximum port size
-#define MAXIPSIZE 40          // Maximum ip size (IPV6 can go up to 39)
-#define PORT "58001"          // Default port (58000 + GroupNo)
-#define LOCALHOST "127.0.0.1" // Default host (current computer)
-
-#define GSIPPREFIX "-n\0"   // GSIP's prefix
-#define GSPORTPREFIX "-p\0" // Gsport's prefix
-
-#define USERINPUTBUFFER 128    // Buffer to store user input
-#define GENERALSIZEBUFFER 2048 // General size to auxiliar buffers
-
-#define MAX_PLAYTIME "600" // Maximum played time
-
-#define CONNECTIONATTEMPS 2 // Number of UDP connection attemps
-
-// Commands
-#define STARTCMD "start\0"
-#define TRYCMD "try\0"
-#define SHOWTRIALSCMD "show_trials\0" or "st\0"
-#define SCOREBOARDCMD "scoreboard\0" or "sb\0"
-#define QUITCMD "quit\0"
-#define DEBUGCMD "debug\0"
-
-// Helpers
-#define UNKNOWN -1
-#define FALSE 0
-#define TRUE 1
-#define ERROR 2
-#define RESTART 3
 
 // Verifies is a set of chars is a number
 int isNumber(char *s)
@@ -478,7 +438,7 @@ int showTrialsCmd(char *GSIP, char *GSport, int PLID)
     {
         sscanf(response, "RST %s %s %s ", status, f_name, f_size_buffer);
 
-        f_data = (char *)malloc(atoi(f_size_buffer) * sizeof(char));
+        f_data = (char *)malloc(atoi(f_size_buffer) * sizeof(char) + 1);
 
         strcpy(f_data, response + 8 + strlen(f_name) + 1 + strlen(f_size_buffer) + 1);
 
@@ -524,11 +484,11 @@ int scoreBoard(char *GSIP, char *GSport)
     {
         sscanf(response, "RSS OK %s %s ", f_name, f_size_buffer);
 
-        f_data = (char *)malloc(atoi(f_size_buffer) * sizeof(char));
+        f_data = (char *)malloc(atoi(f_size_buffer) * sizeof(char) + 1);
 
         strcpy(f_data, response + 7 + strlen(f_name) + 1 + strlen(f_size_buffer) + 2);
 
-        printf("%s", f_data);
+        printf("Scoreboard locally stored in: %s", f_name);
 
         sb_fd = open(f_name, O_WRONLY | O_CREAT | O_TRUNC, 0777);
 

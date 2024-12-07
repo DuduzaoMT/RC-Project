@@ -1,30 +1,7 @@
-#include <iostream>
-#include <fcntl.h>
-#include <vector>
-#include <cstring>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <arpa/inet.h>
+#include "common.h"
+#include "gameserver.h" 
 
 using namespace std;
-
-#define GENERALSIZEBUFFER 2048 // General size to auxiliar buffers
-
-#define MAXPORTSIZE 6        // Maximum port size
-#define PORT "58001"         // Default port (58000 + GroupNo)
-#define VERBOSEDEFAULT false // Default verbose mode
-
-#define VERBOSEPREFIX "-v\0" // Verbose mode prefix
-#define GSPORTPREFIX "-p\0"  // Gsport's prefix
-
-#define FALSE 0
-#define TRUE 1
-#define ERROR 2
 
 int verifyArg(char **user_args, int num_args, int idx, const char *prefix, void *arg_to_change, const void *default_val, bool single_argument)
 {
