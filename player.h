@@ -8,8 +8,6 @@
 #define GSIPPREFIX "-n\0"       // GSIP's prefix
 #define GSPORTPREFIX "-p\0"     // Gsport's prefix
 
-#define USERINPUTBUFFER 128     // Buffer to store user input
-
 #define MAX_PLAYTIME "600"      // Maximum played time
 
 #define CONNECTIONATTEMPS 2     // Number of UDP connection attemps

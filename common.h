@@ -21,11 +21,17 @@
 
 // Helpers
 #define GENERALSIZEBUFFER 2048  // General size to auxiliar buffers
+#define USERINPUTBUFFER 128     // Buffer to store user input
 
 #define UNKNOWN -1
 #define FALSE 0
 #define TRUE 1
 #define ERROR 2
 #define RESTART 3
+
+// Function Helpers
+int isNumber(char *s);
+int verifyStartCmd(char *PLID_buffer, char *max_playtime_buffer);
+int verifyTryCmd(char C1, char C2, char C3, char C4);
 
 #endif

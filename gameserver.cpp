@@ -3,13 +3,13 @@
 
 using namespace std;
 
+// Verifies user arguments
 int verifyArg(char **user_args, int num_args, int idx, const char *prefix, void *arg_to_change, const void *default_val, bool single_argument)
 {
     if (strcmp(user_args[idx], prefix) == 0)
     {
         if (single_argument)
         {
-
             if ((*(int *)default_val) != (*(int *)arg_to_change))
                 return ERROR;
 
@@ -29,6 +29,245 @@ int verifyArg(char **user_args, int num_args, int idx, const char *prefix, void 
     return FALSE;
 }
 
+// Verbose mode
+int verboseMode(int verbose, int PLID, char *request, char *ip, char *port)
+{
+    if (!verbose)
+        return 1;
+
+    char clean_request[GENERALSIZEBUFFER];
+    strncpy(clean_request, request, strlen(request) - 1);
+
+    printf("[REQUEST]: %s, originated from: %s:%s, player id: %d\n", clean_request, ip, port, PLID);
+    return 0;
+}
+
+// TCP connection behaviour
+int TCPConnection(int tcp_fd){
+    int nleft = 2048;
+    int nread = 0;
+    int nwritten = 0;
+    char buffer[GENERALSIZEBUFFER], client_request[GENERALSIZEBUFFER], server_response[GENERALSIZEBUFFER];
+    char *last_digit_pointer = client_request;
+
+    memset(client_request, 0, sizeof(client_request));
+    memset(server_response, 0, sizeof(server_response));
+
+    /* Reading packages */
+    while ((nread = read(tcp_fd, buffer, nleft)) != 0)
+    {   
+        if (nread == -1) /*error*/
+            return 1;
+        buffer[nread] = '\0';
+        printf("[TCP package Read]: .%s.\n", buffer);
+        nleft -= nread;
+        strcpy(last_digit_pointer, buffer);
+        last_digit_pointer += nread;
+        if (*(last_digit_pointer-1) == '\n')
+            break;
+    }
+    /* ---------------- */
+
+    /* Writing packages */
+    sprintf(server_response,"aaaaaaa");
+    nleft = strlen(server_response);
+    last_digit_pointer = server_response;
+    while (nleft > 0)
+    {
+        nwritten = write(tcp_fd, last_digit_pointer, nleft);
+        if (nwritten <= 0) /*error*/
+            return 1;
+        nleft -= nwritten;
+        last_digit_pointer += nwritten;
+        printf("[TCP package Write]: .%s.\n", last_digit_pointer);
+    }
+
+    if (strlen(client_request) <= 0)
+        fprintf(stderr, "No data received\n");
+    
+    /* ---------------- */
+
+    close(tcp_fd);
+    return 0;
+}
+
+// UOP connection behaviour
+int UDPConnection(int udp_fd, sockaddr_in *addr){
+    char client_request[GENERALSIZEBUFFER], server_response[GENERALSIZEBUFFER];
+    int send;
+    socklen_t addrlen = sizeof(*addr);
+
+    memset(client_request, 0, sizeof(client_request));
+    memset(server_response, 0, sizeof(server_response));
+
+    /* Reading packages */
+    ssize_t received = recvfrom(udp_fd, client_request, 128, 0,
+                                (struct sockaddr*)addr, &addrlen);
+    if (received > 0)
+    {
+        client_request[received] = '\0';
+    }
+    else
+        fprintf(stderr, "No data received\n");
+
+    printf("[UDP request]: .%s.\n", client_request);
+    /* ---------------- */
+
+    commandHandler(client_request, server_response);
+
+    /* Writing packages */
+    send = sendto(udp_fd, server_response, strlen(server_response), 0, (struct sockaddr *)addr, addrlen);
+    if (send == -1)
+    {
+        perror("sendto");
+        return 1;
+    }
+    printf("[UDP response]: .%s.\n", server_response);
+    /* ---------------- */
+
+    return 0;
+}
+
+int commandHandler(char *client_request, char *response){
+
+    char opcode[4];
+    strncpy(opcode, client_request, 3);
+
+    if (!strcmp(opcode, "SNG")){
+        if (startCmd(client_request, response) == ERROR){
+            fprintf(stderr, "Error starting game\n");
+            sprintf(response, "RSG ERR\n");
+            return 1;
+        }
+    }
+    else if (!strcmp(opcode, "TRY")){
+        if (tryCmd(client_request, response) == ERROR){
+            fprintf(stderr, "Error in try\n");
+            sprintf(response, "RTR ERR\n");
+            return 1;
+        }
+    }
+    else if (!strcmp(opcode, "QUT")){
+       if (quitCmd(client_request, response) == ERROR){
+            fprintf(stderr, "Error in quit\n");
+            sprintf(response, "RQT ERR\n");
+            return 1;
+        }
+    }
+    else if (!strcmp(opcode, "DBG")){
+        if (debugCmd(client_request, response) == ERROR){
+            fprintf(stderr, "Error in debug\n");
+            sprintf(response, "RQT ERR\n");
+            return 1;
+        }
+    }
+    else if (!strcmp(opcode, "STR")){
+        /* code */
+    }
+    else if (!strcmp(opcode, "SSB")){
+        /* code */
+    }
+    else {
+        fprintf(stderr, "Invalid command\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+int startCmd(char *client_request, char *response){
+    char PLID_buffer[USERINPUTBUFFER], time_buffer[USERINPUTBUFFER];
+    memset(PLID_buffer, 0, sizeof(PLID_buffer));
+    memset(time_buffer, 0, sizeof(time_buffer));
+    
+    sscanf(client_request, "SNG %s %s\n", PLID_buffer, time_buffer);
+
+    // Verify the arguments
+    if (verifyStartCmd(PLID_buffer, time_buffer) == ERROR)
+    {
+        fprintf(stderr, "Invalid arguments\n");
+        return ERROR;
+    }
+
+    // Build response
+    printf("PLID: %s, time:%s\n", PLID_buffer, time_buffer);
+    sprintf(response, "RSG OK\n");
+
+    return 0;
+}
+
+int tryCmd(char *client_request, char *response){
+    char C1, C2, C3, C4;
+    char PLID_buffer[USERINPUTBUFFER], nT_buffer[USERINPUTBUFFER];
+    memset(PLID_buffer, 0, sizeof(PLID_buffer));
+    memset(nT_buffer, 0, sizeof(nT_buffer));
+
+    sscanf(client_request, "TRY %s %c %c %c %c %s\n", PLID_buffer, &C1, &C2, &C3, &C4, nT_buffer);
+
+    if (strlen(PLID_buffer) != 6 || !isNumber(PLID_buffer)){
+        fprintf(stderr, "Invalid PLID\n");
+        return ERROR;
+    }
+
+    if (strlen(nT_buffer) != MAXTRIESLEN || !isNumber(nT_buffer)){
+        fprintf(stderr, "Invalid trial number\n");
+        return ERROR;
+    }
+        
+    if (verifyTryCmd(C1, C2, C3, C4) == ERROR){
+        fprintf(stderr, "Invalid colors\n");
+        return ERROR;
+    }
+    
+    // Build response
+    printf("PLID: %s; Colors: %c, %c, %c, %c; Trial: %s\n", PLID_buffer, C1, C2, C3, C4, nT_buffer);
+    sprintf(response, "SNG NOK\n");
+
+    return 0;
+}
+
+int quitCmd(char *client_request, char *response){
+    char PLID_buffer[USERINPUTBUFFER];
+    memset(PLID_buffer, 0, sizeof(PLID_buffer));
+
+    sscanf(client_request, "QUT %s\n", PLID_buffer);
+
+    if (strlen(PLID_buffer) != 6 || !isNumber(PLID_buffer)){
+        fprintf(stderr, "Invalid PLID\n");
+        return ERROR;
+    }
+
+    // Build response
+    printf("PLID: %s\n", PLID_buffer);
+    sprintf(response, "RQT NOK\n");
+
+    return 0;
+}
+
+int debugCmd(char *client_request, char *response){
+    char PLID_buffer[USERINPUTBUFFER], time_buffer[USERINPUTBUFFER], C1, C2, C3, C4;
+    memset(PLID_buffer, 0, sizeof(PLID_buffer));
+    memset(time_buffer, 0, sizeof(time_buffer));
+
+    sscanf(client_request, "DBG %s %s %c %c %c %c\n", PLID_buffer, time_buffer, &C1, &C2, &C3, &C4);
+
+    if (verifyStartCmd(PLID_buffer, time_buffer) == ERROR){
+        fprintf(stderr, "Invalid arguments\n");
+        return ERROR;
+    }
+
+    if (verifyTryCmd(C1, C2, C3, C4) == ERROR){
+        fprintf(stderr, "Invalid colors\n");
+        return ERROR;
+    }
+
+    // Build response
+    printf("PLID: %s; Time: %s; Colors: %c, %c, %c, %c\n", PLID_buffer, time_buffer, C1, C2, C3, C4);
+    sprintf(response, "RDB OK\n");
+
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     int udp_fd, tcp_fd, errcode;
@@ -38,8 +277,6 @@ int main(int argc, char **argv)
     struct addrinfo hints, *res;
     struct sockaddr_in addr;
     fd_set read_fds, test_fds;
-    char client_request[GENERALSIZEBUFFER],server_response[GENERALSIZEBUFFER];
-
 
     char GSport[MAXPORTSIZE] = PORT;
     int verbose = VERBOSEDEFAULT, verbose_default = VERBOSEDEFAULT;
@@ -97,7 +334,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // Configuração do endereço local (localhost)
+    // Localhost configuration
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;      // IPv4
     hints.ai_socktype = INADDR_ANY; // Sockets
@@ -138,8 +375,6 @@ int main(int argc, char **argv)
     // Main server loop
     while (1)
     {
-        memset(client_request,0,sizeof(client_request));
-        memset(server_response,0,sizeof(server_response));
         test_fds=read_fds; 
         memset((void *)&timeout,0,sizeof(timeout));
         timeout.tv_sec=10;
@@ -156,74 +391,32 @@ int main(int argc, char **argv)
         {
             fprintf(stderr, "No data received\n");
         }
+
         // Test for TCP connection
         else if (FD_ISSET(tcp_fd, &test_fds))
         {
             int new_fd;
-            // Data is available to read
-            sockaddr_in recv_addr;
-            socklen_t recv_len = sizeof(recv_addr);
-            
+
             new_fd=accept(tcp_fd,(struct sockaddr*)&addr,&addrlen);
-            if(new_fd==-1)
+            if(new_fd==-1){
+                perror("accept");
                 return 1;
-
-            int nleft = 2048;
-            int nread = 0;
-            int nbytes = 0;
-            int nwritten = 0;
-            char buffer[GENERALSIZEBUFFER];
-            char *last_digit_pointer = client_request;
-
-            while ((nread = read(new_fd, buffer, nleft)) != 0)
-            {   
-                if (nread == -1) /*error*/
-                    return 1;
-                buffer[nread] = '\0';
-                printf("[TCP package Read]: .%s.\n", buffer);
-                nleft -= nread;
-                strcpy(last_digit_pointer, buffer);
-                last_digit_pointer += nread;
-                if (*(last_digit_pointer-1) == '\n')
-                    break;
             }
 
-            sprintf(server_response,"aaaaaaa");
-            nbytes = strlen(server_response);
-            nleft = nbytes;
-            last_digit_pointer = server_response;
-
-            while (nleft > 0)
-            {
-                nwritten = write(new_fd, last_digit_pointer, nleft);
-                if (nwritten <= 0) /*error*/
-                    return 1;
-                nleft -= nwritten;
-                last_digit_pointer += nwritten;
-                printf("[TCP package Write]: .%s.\n", last_digit_pointer);
+            pid_t pid = fork();
+            if (pid == 0){
+                close(tcp_fd);
+                TCPConnection(new_fd);
             }
-
-            if (strlen(client_request) <= 0)
-                fprintf(stderr, "No data received\n");
-
-            close(new_fd);
-            
+            else{
+                close(new_fd);
+            }            
         }
+
+        // Test for UDP connection
         else if (FD_ISSET(udp_fd, &test_fds)) {
-            sockaddr_in recv_addr;
-            socklen_t recv_len = sizeof(recv_addr);
-            ssize_t received = recvfrom(udp_fd, client_request, 128, 0,
-                                     (struct sockaddr*)&recv_addr, &recv_len);
-
-            if (received > 0)
-            {
-                client_request[received] = '\0';
-            }
-            else
-                fprintf(stderr, "No data received\n");
+            UDPConnection(udp_fd, &addr);
         }
-
-        printf("[Client Request]: .%s.\n", client_request);
     }
 
     freeaddrinfo(res);

@@ -3,19 +3,6 @@
 
 using namespace std;
 
-// Verifies is a set of chars is a number
-int isNumber(char *s)
-{
-
-    for (int i = 0; i < strlen(s); i++)
-    {
-        if (!isdigit(s[i]))
-            return false;
-    }
-
-    return true;
-}
-
 // Verifies the arguments of the program once it is called
 int verifyArg(char **user_args, int idx, const char *prefix, char *arg_to_change, const char *default_val)
 {
@@ -33,7 +20,7 @@ int verifyArg(char **user_args, int idx, const char *prefix, char *arg_to_change
 int UDPInteraction(char *request, char *response, char *GSIP, char *GSport)
 {
 
-    int fd, errcode, argValid;
+    int fd, errcode;
     fd_set read_fds;
     timeval timeout;
     ssize_t send, rec;
@@ -175,7 +162,7 @@ int TCPInteraction(char *request, char *response, char *GSIP, char *GSport)
 
     while (nleft > 0)
     {
-        printf("[TCP request]: %s\n", request);
+        printf("[TCP request]: .%s.\n", request);
         nwritten = write(fd, request, nleft);
         if (nwritten <= 0) /*error*/
             return 1;
@@ -225,28 +212,20 @@ int startCmd(char *arguments, char *GSIP, char *GSport, int *PLID, int *max_play
     strcpy(max_playtime_buffer, "");
 
     sscanf(arguments, "%s %s", PLID_buffer, max_playtime_buffer);
-
-    if (strlen(PLID_buffer) == 6 && isNumber(PLID_buffer))
-        new_PLID = atoi(PLID_buffer);
-    else
+   
+    // Verify the arguments
+    if (verifyStartCmd(PLID_buffer, max_playtime_buffer) == ERROR)
     {
-        fprintf(stderr, "Invalid PLID\n");
+        fprintf(stderr, "Invalid arguments\n");
         return ERROR;
     }
 
-    if (isNumber(max_playtime_buffer))
-    {
-        new_max_playtime = atoi(max_playtime_buffer);
-        if (new_max_playtime <= 0 || new_max_playtime > 600)
-        {
-            fprintf(stderr, "Invalid max_playtime\n");
-            return ERROR;
-        }
-    }
-
+    // Build request
+    new_PLID = atoi(PLID_buffer);
+    new_max_playtime = atoi(max_playtime_buffer);
     sprintf(request, "SNG %06d %03d\n", new_PLID, new_max_playtime);
 
-    // Exibição da resposta do servidor
+    // Server response
     if (UDPInteraction(request, response, GSIP, GSport))
         return ERROR;
 
@@ -275,38 +254,21 @@ int tryCmd(char *arguments, char *GSIP, char *GSport, int *trial_number, int PLI
     char C1, C2, C3, C4;
     char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
 
-    const int n_colors = 6, n_guess = 4;
+    int nB, nW, r_trial_number = -1;
 
-    int match_colors = 0, nB, nW, r_trial_number = -1;
-
-    char colors[n_colors] = {'R', 'G', 'B', 'Y', 'O', 'P'};
-
+    
     int n_args = sscanf(arguments, "%s %s %s %s", &C1, &C2, &C3, &C4);
-
+    /*
     if (n_args != 4 || strlen(arguments) != 9)
     {
         fprintf(stderr, "Invalid Colors\n");
         return ERROR;
     }
-
-    char guess_colors[n_guess] = {C1, C2, C3, C4};
-
-    for (int i = 0; i < n_guess; i++)
-        for (int j = 0; j < n_colors; j++)
-            if (guess_colors[i] == colors[j])
-            {
-                match_colors++;
-                break;
-            }
-
-    if (match_colors != 4)
-    {
-        fprintf(stderr, "Invalid Colors\n");
+    
+    if(verifyTryCmd(C1, C2, C3, C4) == ERROR)
         return ERROR;
-    }
-
-    printf("trial_number: %d\n", *trial_number);
-    sprintf(request, "TRY %06d %c %c %c %c %d\n", PLID, C1, C2, C3, C4, 4);
+    */
+    sprintf(request, "TRY %06d %c %c %c %c %d\n", PLID, C1, C2, C3, C4, *trial_number);
 
     // Exibição da resposta do servidor
     if (UDPInteraction(request, response, GSIP, GSport))
@@ -411,6 +373,63 @@ int exitCmd(char *GSIP, char *GSport, int PLID)
     return true;
 }
 
+int debugCmd(char *arguments, char *GSIP, char *GSport, int *PLID, int *max_playtime, int *trial_number)
+{
+
+    int new_PLID, new_max_playtime;
+
+    char PLID_buffer[USERINPUTBUFFER], max_playtime_buffer[USERINPUTBUFFER], C1, C2, C3, C4;
+    char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
+
+    // Reset the buffers
+    strcpy(PLID_buffer, "");
+    strcpy(max_playtime_buffer, "");
+
+    sscanf(arguments, "%s %s %c %c %c %c", PLID_buffer, max_playtime_buffer, &C1, &C2, &C3, &C4);
+
+    if (strlen(PLID_buffer) == 6 && isNumber(PLID_buffer))
+        new_PLID = atoi(PLID_buffer);
+    else
+    {
+        fprintf(stderr, "Invalid PLID\n");
+        return ERROR;
+    }
+
+    if (isNumber(max_playtime_buffer))
+    {
+        new_max_playtime = atoi(max_playtime_buffer);
+        if (new_max_playtime <= 0 || new_max_playtime > 600)
+        {
+            fprintf(stderr, "Invalid max_playtime\n");
+            return ERROR;
+        }
+    }
+
+    sprintf(request, "DBG %06d %03d %c %c %c %c\n", new_PLID, new_max_playtime, C1, C2, C3, C4);
+
+    // Exibição da resposta do servidor
+    if (UDPInteraction(request, response, GSIP, GSport))
+        return ERROR;
+
+    if (!strcmp(response, "RDB OK\n"))
+    {
+        fprintf(stdout, "New Game started (max %d sec)\n", new_max_playtime);
+    }
+    else if (!strcmp(response, "RDB NOK\n"))
+    {
+        fprintf(stdout, "The player with PLID:%06d has an ongoing game", new_PLID);
+        return ERROR;
+    }
+    else
+        return ERROR;
+
+    (*trial_number) = 1;
+    (*PLID) = new_PLID;
+    (*max_playtime) = new_max_playtime;
+
+    return false;
+}
+
 int showTrialsCmd(char *GSIP, char *GSport, int PLID)
 {
 
@@ -513,63 +532,6 @@ int scoreBoard(char *GSIP, char *GSport)
     }
 
     return 0;
-}
-
-int debugCmd(char *arguments, char *GSIP, char *GSport, int *PLID, int *max_playtime, int *trial_number)
-{
-
-    int new_PLID, new_max_playtime;
-
-    char PLID_buffer[USERINPUTBUFFER], max_playtime_buffer[USERINPUTBUFFER], C1, C2, C3, C4;
-    char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
-
-    // Reset the buffers
-    strcpy(PLID_buffer, "");
-    strcpy(max_playtime_buffer, "");
-
-    sscanf(arguments, "%s %s %c %c %c %c", PLID_buffer, max_playtime_buffer, &C1, &C2, &C3, &C4);
-
-    if (strlen(PLID_buffer) == 6 && isNumber(PLID_buffer))
-        new_PLID = atoi(PLID_buffer);
-    else
-    {
-        fprintf(stderr, "Invalid PLID\n");
-        return ERROR;
-    }
-
-    if (isNumber(max_playtime_buffer))
-    {
-        new_max_playtime = atoi(max_playtime_buffer);
-        if (new_max_playtime <= 0 || new_max_playtime > 600)
-        {
-            fprintf(stderr, "Invalid max_playtime\n");
-            return ERROR;
-        }
-    }
-
-    sprintf(request, "DBG %06d %03d %c %c %c %c\n", new_PLID, new_max_playtime, C1, C2, C3, C4);
-
-    // Exibição da resposta do servidor
-    if (UDPInteraction(request, response, GSIP, GSport))
-        return ERROR;
-
-    if (!strcmp(response, "RDB OK\n"))
-    {
-        fprintf(stdout, "New Game started (max %d sec)\n", new_max_playtime);
-    }
-    else if (!strcmp(response, "RDB NOK\n"))
-    {
-        fprintf(stdout, "The player with PLID:%06d has an ongoing game", new_PLID);
-        return ERROR;
-    }
-    else
-        return ERROR;
-
-    (*trial_number) = 1;
-    (*PLID) = new_PLID;
-    (*max_playtime) = new_max_playtime;
-
-    return false;
 }
 
 int main(int argc, char **argv)
