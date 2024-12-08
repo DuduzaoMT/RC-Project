@@ -72,6 +72,7 @@ int TCPConnection(int tcp_fd){
     sprintf(server_response,"aaaaaaa");
     nleft = strlen(server_response);
     last_digit_pointer = server_response;
+    printf("[TCP package Write]: .%s.\n", server_response);
     while (nleft > 0)
     {
         nwritten = write(tcp_fd, last_digit_pointer, nleft);
@@ -79,12 +80,7 @@ int TCPConnection(int tcp_fd){
             return 1;
         nleft -= nwritten;
         last_digit_pointer += nwritten;
-        printf("[TCP package Write]: .%s.\n", last_digit_pointer);
     }
-
-    if (strlen(client_request) <= 0)
-        fprintf(stderr, "No data received\n");
-    
     /* ---------------- */
 
     close(tcp_fd);
@@ -402,15 +398,8 @@ int main(int argc, char **argv)
                 perror("accept");
                 return 1;
             }
-
-            pid_t pid = fork();
-            if (pid == 0){
-                close(tcp_fd);
-                TCPConnection(new_fd);
-            }
-            else{
-                close(new_fd);
-            }            
+            
+            TCPConnection(new_fd);
         }
 
         // Test for UDP connection

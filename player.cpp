@@ -160,9 +160,10 @@ int TCPInteraction(char *request, char *response, char *GSIP, char *GSport)
     nbytes = strlen(request);
     nleft = nbytes;
 
+    printf("[TCP request]: .%s.\n", request);
+
     while (nleft > 0)
     {
-        printf("[TCP request]: .%s.\n", request);
         nwritten = write(fd, request, nleft);
         if (nwritten <= 0) /*error*/
             return 1;
