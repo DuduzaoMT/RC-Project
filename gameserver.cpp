@@ -1,3 +1,4 @@
+#include <time.h>
 #include "common.h"
 #include "gameserver.h" 
 
@@ -171,18 +172,71 @@ int commandHandler(char *client_request, char *response){
     return 0;
 }
 
+void getColours(char *colours){
+
+    char caracteres[] = {'R', 'G', 'B', 'Y', 'O', 'P'};
+    int tamanho_conjunto = 6;
+
+    for (int i = 0; i < 4; i++) {
+        colours[i] = caracteres[rand() % tamanho_conjunto];
+    }
+
+    colours[4] = '\0';
+}
+
 int startCmd(char *client_request, char *response){
-    char PLID_buffer[USERINPUTBUFFER], time_buffer[USERINPUTBUFFER];
+
+    int player_fd,time_int;
+    char PLID_buffer[USERINPUTBUFFER], time_buffer[USERINPUTBUFFER],f_name[GENERALSIZEBUFFER], f_data[GENERALSIZEBUFFER];
+    time_t fulltime;
+    struct tm *current_time;
+    char time_str[20],colours[5];
+
     memset(PLID_buffer, 0, sizeof(PLID_buffer));
     memset(time_buffer, 0, sizeof(time_buffer));
     
-    sscanf(client_request, "SNG %s %s\n", PLID_buffer, time_buffer);
+    if (sscanf(client_request, "SNG %s %s\n", PLID_buffer, time_buffer) != 2){
+        fprintf(stderr, "Invalid arguments\n");
+        return ERROR;
+    };
 
     // Verify the arguments
     if (verifyStartCmd(PLID_buffer, time_buffer) == ERROR)
     {
         fprintf(stderr, "Invalid arguments\n");
         return ERROR;
+    }
+
+    sprintf(f_name,"GAMES/GAME_%s.txt",PLID_buffer);
+    player_fd = open(f_name, O_RDONLY);
+
+    // FILE doesn`t exist
+    if(player_fd == -1){
+        player_fd = open(f_name, O_WRONLY | O_CREAT | O_TRUNC, 0777);
+        if (player_fd == -1) {
+            perror("Erro ao criar o ficheiro");
+            return 1;
+        }
+
+        // content
+        time_int = atoi(time_buffer);
+        time(&fulltime);
+        current_time = gmtime(&fulltime);
+        sprintf(time_str,"%04d-%02d-%02d %02d:%02d:%02d",current_time->tm_year+1900,current_time->tm_mon+1,current_time->tm_mday,
+        current_time->tm_hour,current_time->tm_min,current_time->tm_sec);
+        getColours(colours);
+        sprintf(f_data,"%s P %s %d %s %ld",PLID_buffer,colours,time_int,time_str,fulltime);
+
+        // write to game file
+        if (write(player_fd, f_data, strlen(f_data)) < 0)
+        {
+            close(player_fd);
+            fprintf(stderr, "Couldn't write to file\n");
+            return ERROR;
+        }
+    }
+    else{
+        // TODO
     }
 
     // Build response
@@ -198,7 +252,10 @@ int tryCmd(char *client_request, char *response){
     memset(PLID_buffer, 0, sizeof(PLID_buffer));
     memset(nT_buffer, 0, sizeof(nT_buffer));
 
-    sscanf(client_request, "TRY %s %c %c %c %c %s\n", PLID_buffer, &C1, &C2, &C3, &C4, nT_buffer);
+    if(sscanf(client_request, "TRY %s %c %c %c %c %s\n", PLID_buffer, &C1, &C2, &C3, &C4, nT_buffer)!= 6){
+        fprintf(stderr, "Invalid sintax\n");
+        return ERROR;
+    }
 
     if (strlen(PLID_buffer) != 6 || !isNumber(PLID_buffer)){
         fprintf(stderr, "Invalid PLID\n");
@@ -217,7 +274,7 @@ int tryCmd(char *client_request, char *response){
     
     // Build response
     printf("PLID: %s; Colors: %c, %c, %c, %c; Trial: %s\n", PLID_buffer, C1, C2, C3, C4, nT_buffer);
-    sprintf(response, "SNG NOK\n");
+    sprintf(response, "RTR NOK\n");
 
     return 0;
 }

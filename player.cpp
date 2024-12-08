@@ -8,12 +8,13 @@ int verifyArg(char **user_args, int idx, const char *prefix, char *arg_to_change
 {
     if (strcmp(user_args[idx], prefix) == 0)
     {
-        if (strcmp(default_val, arg_to_change))
-            return 1;
+        //if (strcmp(default_val, arg_to_change))
+            //return 0;
 
         strcpy(arg_to_change, user_args[idx + 1]);
+        return 0;
     }
-    return 0;
+    return 1;
 }
 
 // Full UDP connection
@@ -259,7 +260,7 @@ int tryCmd(char *arguments, char *GSIP, char *GSport, int *trial_number, int PLI
 
     
     int n_args = sscanf(arguments, "%s %s %s %s", &C1, &C2, &C3, &C4);
-    /*
+    
     if (n_args != 4 || strlen(arguments) != 9)
     {
         fprintf(stderr, "Invalid Colors\n");
@@ -268,7 +269,7 @@ int tryCmd(char *arguments, char *GSIP, char *GSport, int *trial_number, int PLI
     
     if(verifyTryCmd(C1, C2, C3, C4) == ERROR)
         return ERROR;
-    */
+    
     sprintf(request, "TRY %06d %c %c %c %c %d\n", PLID, C1, C2, C3, C4, *trial_number);
 
     // Exibição da resposta do servidor
@@ -547,6 +548,7 @@ int main(int argc, char **argv)
     int max_playtime = UNKNOWN;
 
     int command_status = -1;
+    int match_args = 0;
 
     // Argument verification
     for (int i = 1; i < argc; i += 2)
@@ -557,17 +559,19 @@ int main(int argc, char **argv)
             exit(1);
         }
 
-        if (verifyArg(argv, i, GSIPPREFIX, GSIP, LOCALHOST))
+        if (!verifyArg(argv, i, GSIPPREFIX, GSIP, LOCALHOST))
         {
-            fprintf(stderr, "Invalid arguments\n");
-            exit(1);
+            match_args+=1;
         }
 
-        if (verifyArg(argv, i, GSPORTPREFIX, GSport, PORT))
+        if (!verifyArg(argv, i, GSPORTPREFIX, GSport, PORT))
         {
-            fprintf(stderr, "Invalid arguments\n");
-            exit(1);
+            match_args += 1;
         }
+    }
+    if ((argc > 2 && argc < 4 && match_args != 1) || (argc > 4 && match_args != 2)){
+        fprintf(stderr, "Invalid arguments\n");
+        exit(1);
     }
 
     printf("IP: %s\nPort: %s\n", GSIP, GSport);
