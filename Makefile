@@ -2,13 +2,13 @@
 CC = g++
 
 # Alvos
-all: player gameserver
+all: player gs
 
 player: player.cpp
 	$(CC) -o player player.cpp common.cpp
 
-gameserver: gameserver.cpp
-	$(CC) -o gameserver gameserver.cpp common.cpp
+gs: gs.cpp
+	$(CC) -o gs gs.cpp common.cpp
  
 clean:
-	rm -f player gameserver
+	rm -f player gs

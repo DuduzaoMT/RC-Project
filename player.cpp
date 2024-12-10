@@ -571,7 +571,7 @@ int main(int argc, char **argv)
     }
     if ((argc > 2 && argc < 4 && match_args != 1) || (argc > 4 && match_args != 2)){
         fprintf(stderr, "Invalid arguments\n");
-        exit(1);
+        return 1;
     }
 
     printf("IP: %s\nPort: %s\n", GSIP, GSport);
