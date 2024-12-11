@@ -1,4 +1,3 @@
-#include <time.h>
 #include "common.h"
 #include "gs.h" 
 
@@ -125,37 +124,123 @@ int UDPConnection(int udp_fd, sockaddr_in *addr){
     return 0;
 }
 
+int gameAlreadyEnded(char *file_name){
+
+    char buffer[GENERALSIZEBUFFER], buffer1[USERINPUTBUFFER], buffer2[USERINPUTBUFFER], buffer3[USERINPUTBUFFER],
+         buffer4[USERINPUTBUFFER], buffer5[USERINPUTBUFFER];
+    time_t current_time, start_time;
+    int total_time;
+    FILE *player_fd;
+
+    time(&current_time);
+
+    player_fd = fopen(file_name, "r");
+    if (!player_fd)
+        return ERROR;
+    
+    fgets(buffer, sizeof(buffer), player_fd);
+    sscanf(buffer,"%s %s %s %d %s %s %ld",buffer1,buffer2,buffer3,&total_time,buffer4, buffer5,&start_time);
+
+    fclose(player_fd);
+
+    if (total_time < (current_time-start_time))
+        return true;
+    
+    return false;
+}
+
+int storeResult(char *file_name, char code){
+
+    char buffer[GENERALSIZEBUFFER], PLID[USERINPUTBUFFER], buffer2[USERINPUTBUFFER], buffer3[USERINPUTBUFFER],
+         YYYYMMDD[USERINPUTBUFFER], HHMMSS[USERINPUTBUFFER];
+    char new_file_name[GENERALSIZEBUFFER];
+    int year, month, day, hour, minute, second;
+    time_t current_time, start_time, finish_time;
+    struct tm *struct_finish_time;
+    int total_time, min_time;
+    FILE *player_fd;
+
+    memset(buffer, 0, sizeof(buffer));
+    memset(buffer2, 0, sizeof(buffer2));
+    memset(PLID, 0, sizeof(PLID));
+    memset(buffer3, 0, sizeof(buffer3));
+    memset(YYYYMMDD, 0, sizeof(YYYYMMDD));
+    memset(HHMMSS, 0, sizeof(HHMMSS));
+    memset(new_file_name, 0, sizeof(new_file_name));
+
+    time(&current_time);
+
+    player_fd = fopen(file_name, "a+");
+    if (!player_fd)
+        return ERROR;
+    
+    fgets(buffer, sizeof(buffer), player_fd);
+    printf("%s\n", buffer);
+    sscanf(buffer,"%s %s %s %d %s %s %ld",PLID,buffer2,buffer3,&total_time,YYYYMMDD,HHMMSS,&start_time);
+    min_time = MIN(total_time, current_time-start_time);
+
+    finish_time = start_time+min_time;
+    struct_finish_time = gmtime(&finish_time);
+    sprintf(buffer2,"%04d-%02d-%02d %02d:%02d:%02d",struct_finish_time->tm_year+1900,struct_finish_time->tm_mon+1,struct_finish_time->tm_mday,
+    struct_finish_time->tm_hour,struct_finish_time->tm_min,struct_finish_time->tm_sec);
+    fprintf(player_fd, "%s %d\n", buffer2, min_time);
+
+    fclose(player_fd);
+
+    
+    // Build new file name
+    sscanf(YYYYMMDD, "%d-%d-%d", &year, &month, &day);
+    sscanf(HHMMSS, "%d:%d:%d", &hour, &minute, &second);
+    sprintf(new_file_name, "GAMES/%s/%04d%02d%02d_%02d%02d%02d_%c.txt", PLID, year, month, day, hour, minute, second, code);
+
+    // Create new directory
+    sprintf(buffer, "GAMES/%s", PLID);
+    if (mkdir(buffer, 0777) != 0) {
+        if (errno != EEXIST)
+        {
+            perror("mkdir");
+            return ERROR;
+        }
+    } 
+
+    // Move the file
+    if (rename(file_name, new_file_name) != 0)
+    {
+        perror("rename");
+        return ERROR;
+    }
+
+    return 0;
+    
+}
+
 int commandHandler(char *client_request, char *response){
 
     char opcode[4];
     strncpy(opcode, client_request, 3);
 
     if (!strcmp(opcode, "SNG")){
-        if (startCmd(client_request, response) == ERROR){
+        if (startCmd(client_request, response) == ERR){
             fprintf(stderr, "Error starting game\n");
             sprintf(response, "RSG ERR\n");
-            return 1;
         }
     }
     else if (!strcmp(opcode, "TRY")){
-        if (tryCmd(client_request, response) == ERROR){
+        if (tryCmd(client_request, response) == ERR){
             fprintf(stderr, "Error in try\n");
             sprintf(response, "RTR ERR\n");
-            return 1;
         }
     }
     else if (!strcmp(opcode, "QUT")){
-       if (quitCmd(client_request, response) == ERROR){
+       if (quitCmd(client_request, response) == ERR){
             fprintf(stderr, "Error in quit\n");
             sprintf(response, "RQT ERR\n");
-            return 1;
         }
     }
     else if (!strcmp(opcode, "DBG")){
-        if (debugCmd(client_request, response) == ERROR){
+        if (debugCmd(client_request, response) == ERR){
             fprintf(stderr, "Error in debug\n");
             sprintf(response, "RQT ERR\n");
-            return 1;
         }
     }
     else if (!strcmp(opcode, "STR")){
@@ -166,7 +251,6 @@ int commandHandler(char *client_request, char *response){
     }
     else {
         fprintf(stderr, "Invalid command\n");
-        return 1;
     }
 
     return 0;
@@ -187,15 +271,17 @@ void getColours(char *colours){
 int startCmd(char *client_request, char *response){
 
     FILE *player_fd;
-    int time_int;
+    int total_time;
     char PLID_buffer[USERINPUTBUFFER], time_buffer[USERINPUTBUFFER],f_name[GENERALSIZEBUFFER], first_line[GENERALSIZEBUFFER],
-         buffer[GENERALSIZEBUFFER];
+         buffer[GENERALSIZEBUFFER], f_data[GENERALSIZEBUFFER];
     time_t fulltime;
     struct tm *current_time;
     char time_str[20],colours[5];
 
     memset(PLID_buffer, 0, sizeof(PLID_buffer));
     memset(time_buffer, 0, sizeof(time_buffer));
+    memset(first_line, 0, sizeof(first_line));
+    memset(buffer, 0, sizeof(buffer));
     
     if (sscanf(client_request, "SNG %s %s\n", PLID_buffer, time_buffer) != 2){
         fprintf(stderr, "Invalid arguments\n");
@@ -211,65 +297,46 @@ int startCmd(char *client_request, char *response){
 
     sprintf(f_name,"GAMES/GAME_%s.txt",PLID_buffer);
 
-    player_fd = fopen(f_name, "w+");
-
-    if(!player_fd){
-        return ERR;
-    }
-
-    if (fgets(first_line, sizeof(first_line), player_fd) == NULL)
+    player_fd = fopen(f_name, "r");
+    
+    if (player_fd != NULL)
     {
-        
-    }
-    else
-    {
-        if (fgets(buffer, sizeof(buffer), player_fd) != NULL)
+        // File already exists
+        fgets(first_line, sizeof(first_line), player_fd);
+
+        if (fgets(buffer, sizeof(buffer), player_fd))
         {
-            return NOK;
+            // Game has not ended (inform player)
+            if (!gameAlreadyEnded(f_name))
+            {
+                sprintf(response, "RSG NOK\n");
+                fclose(player_fd);
+                return 0;
+            }
+
+            // Game has ended (store the results)
+            storeResult(f_name, 'T');
+
         }
-        
+
+        fclose(player_fd);
     }
     
-    
+    // File didnt exist or game hasnt started
+    player_fd = fopen(f_name, "w");
 
-    /*
-    if(player_fd == NULL){
-        player_fd = fopen(f_name, "w");
-        if (player_fd == NULL) {
-            perror("Erro ao criar o ficheiro");
-            return 1;
-        }
+    // Build content 
+    total_time = atoi(time_buffer);
+    time(&fulltime);
+    current_time = gmtime(&fulltime);
+    sprintf(time_str,"%04d-%02d-%02d %02d:%02d:%02d",current_time->tm_year+1900,current_time->tm_mon+1,current_time->tm_mday,
+    current_time->tm_hour,current_time->tm_min,current_time->tm_sec);
+    getColours(colours);
 
-        // content
-        time_int = atoi(time_buffer);
-        time(&fulltime);
-        current_time = gmtime(&fulltime);
-        sprintf(time_str,"%04d-%02d-%02d %02d:%02d:%02d",current_time->tm_year+1900,current_time->tm_mon+1,current_time->tm_mday,
-        current_time->tm_hour,current_time->tm_min,current_time->tm_sec);
-        getColours(colours);
-        sprintf(f_data,"%s P %s %d %s %ld",PLID_buffer,colours,time_int,time_str,fulltime);
+    // Write to file
+    fprintf(player_fd,"%s P %s %d %s %ld",PLID_buffer,colours,total_time,time_str,fulltime);
+    fclose(player_fd);
 
-        // write to game file
-        if (write(player_fd, f_data, strlen(f_data)) < 0)
-        {
-            close(player_fd);
-            fprintf(stderr, "Couldn't write to file\n");
-            return ERROR;
-        }
-    }
-    // FILE exists
-    else{
-        
-        if (read(player_fd, f_data,) < 0)
-        {
-            close(player_fd);
-            fprintf(stderr, "Couldn't write to file\n");
-            return ERROR;
-        }
-    }*/
-
-    // Build response
-    printf("PLID: %s, time:%s\n", PLID_buffer, time_buffer);
     sprintf(response, "RSG OK\n");
 
     return 0;
