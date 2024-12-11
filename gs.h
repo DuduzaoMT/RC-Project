@@ -31,12 +31,12 @@ int storeResult(char *file_name, char code);
 
 // Socket connections 
 int TCPConnection(int tcp_fd);
-int UDPConnection(int udp_fd, struct sockaddr_in *addr);
+int UDPConnection(int udp_fd, struct sockaddr_in *addr,int * trial_number);
 
 // Commands
-int commandHandler(char *client_request, char *response);
+int commandHandler(char *client_request, char *response,int * trial_number);
 int startCmd(char *client_request, char *response);
-int tryCmd(char *client_request, char *response);
+int tryCmd(char *client_request, char *response,int * trial_number);
 int quitCmd(char *client_request, char *response);
 int debugCmd(char *client_request, char *response);
 

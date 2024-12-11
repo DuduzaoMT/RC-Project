@@ -88,7 +88,7 @@ int TCPConnection(int tcp_fd){
 }
 
 // UOP connection behaviour
-int UDPConnection(int udp_fd, sockaddr_in *addr){
+int UDPConnection(int udp_fd, sockaddr_in *addr,int *trial_number){
     char client_request[GENERALSIZEBUFFER], server_response[GENERALSIZEBUFFER];
     int send;
     socklen_t addrlen = sizeof(*addr);
@@ -109,7 +109,7 @@ int UDPConnection(int udp_fd, sockaddr_in *addr){
     printf("[UDP request]: .%s.\n", client_request);
     /* ---------------- */
 
-    commandHandler(client_request, server_response);
+    commandHandler(client_request, server_response,trial_number);
 
     /* Writing packages */
     send = sendto(udp_fd, server_response, strlen(server_response), 0, (struct sockaddr *)addr, addrlen);
@@ -145,7 +145,6 @@ int gameAlreadyEnded(char *file_name){
 
     if (total_time < (current_time-start_time))
         return true;
-    
     return false;
 }
 
@@ -214,7 +213,7 @@ int storeResult(char *file_name, char code){
     
 }
 
-int commandHandler(char *client_request, char *response){
+int commandHandler(char *client_request, char *response,int *trial_number){
 
     char opcode[4];
     strncpy(opcode, client_request, 3);
@@ -226,7 +225,7 @@ int commandHandler(char *client_request, char *response){
         }
     }
     else if (!strcmp(opcode, "TRY")){
-        if (tryCmd(client_request, response) == ERR){
+        if (tryCmd(client_request, response,trial_number) == ERROR){
             fprintf(stderr, "Error in try\n");
             sprintf(response, "RTR ERR\n");
         }
@@ -306,11 +305,13 @@ int startCmd(char *client_request, char *response){
 
         if (fgets(buffer, sizeof(buffer), player_fd))
         {
+            
+            fclose(player_fd);
+
             // Game has not ended (inform player)
             if (!gameAlreadyEnded(f_name))
             {
                 sprintf(response, "RSG NOK\n");
-                fclose(player_fd);
                 return 0;
             }
 
@@ -318,8 +319,7 @@ int startCmd(char *client_request, char *response){
             storeResult(f_name, 'T');
 
         }
-
-        fclose(player_fd);
+        else{fclose(player_fd);}
     }
     
     // File didnt exist or game hasnt started
@@ -334,7 +334,7 @@ int startCmd(char *client_request, char *response){
     getColours(colours);
 
     // Write to file
-    fprintf(player_fd,"%s P %s %d %s %ld",PLID_buffer,colours,total_time,time_str,fulltime);
+    fprintf(player_fd,"%s P %s %d %s %ld\n",PLID_buffer,colours,total_time,time_str,fulltime);
     fclose(player_fd);
 
     sprintf(response, "RSG OK\n");
@@ -342,13 +342,51 @@ int startCmd(char *client_request, char *response){
     return 0;
 }
 
-int tryCmd(char *client_request, char *response){
-    char C1, C2, C3, C4;
-    char PLID_buffer[USERINPUTBUFFER], nT_buffer[USERINPUTBUFFER];
+int getBlackAndWhite(int* nB, int*nW, char *colours, char *guess_colours){
+
+    for (int i=0;i<4;i++){
+
+        // right position
+        if(colours[i]==guess_colours[i]){
+            colours[i] = 'X';
+            *nB+=1;
+        }
+        else{
+            for (int j=0;j<4;j++){
+                if (guess_colours[i] == colours[j]){
+                    colours[j] = 'X';
+                    *nW+=1;
+                    break;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+int dupGuess(FILE *player_fd,char *guess_colours){
+    char line[USERINPUTBUFFER];
+    char prev_guess[5];
+    int nt,nb,nw;
+    while(fgets(line, sizeof(line), player_fd)){
+        sscanf(line,"T: %s %d %d %d",prev_guess,&nt,&nb,&nw);
+        if (!strcmp(prev_guess,guess_colours)){
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+int tryCmd(char *client_request, char *response,int *trial_number){
+    char C1, C2, C3, C4, C1_guess, C2_guess, C3_guess, C4_guess;
+    char PLID_buffer[USERINPUTBUFFER], nT_buffer[USERINPUTBUFFER],f_name[GENERALSIZEBUFFER],
+        colours[GENERALSIZEBUFFER], buffer2[USERINPUTBUFFER], buffer3[USERINPUTBUFFER],
+        buffer4[USERINPUTBUFFER], buffer5[USERINPUTBUFFER], first_line[GENERALSIZEBUFFER];
     memset(PLID_buffer, 0, sizeof(PLID_buffer));
     memset(nT_buffer, 0, sizeof(nT_buffer));
+    FILE *player_fd;
 
-    if(sscanf(client_request, "TRY %s %c %c %c %c %s\n", PLID_buffer, &C1, &C2, &C3, &C4, nT_buffer)!= 6){
+    if(sscanf(client_request, "TRY %s %c %c %c %c %s\n", PLID_buffer, &C1_guess, &C2_guess, &C3_guess, &C4_guess, nT_buffer)!= 6){
         fprintf(stderr, "Invalid sintax\n");
         return ERROR;
     }
@@ -363,14 +401,81 @@ int tryCmd(char *client_request, char *response){
         return ERROR;
     }
         
-    if (verifyTryCmd(C1, C2, C3, C4) == ERROR){
+    if (verifyTryCmd(C1_guess, C2_guess, C3_guess, C4_guess) == ERROR){
         fprintf(stderr, "Invalid colors\n");
         return ERROR;
     }
-    
+
+    if (atoi(nT_buffer) != *trial_number){
+        sprintf(response, "RTR INV\n");
+        return 0;
+    }
+
+    sprintf(f_name,"GAMES/GAME_%s.txt",PLID_buffer);
+
+    // verify if the file exists
+    player_fd = fopen(f_name, "r");
+    if (player_fd == NULL){
+        sprintf(response, "RTR NOK\n");
+        return 0;
+    }
+
+    time_t current_time=0, start_time=0;
+    int total_time,game_time;
+    int nB=0,nW=0;
+    char guess_colours[5];
+
+    time(&current_time);
+
+    // read first line
+    fgets(first_line, sizeof(first_line), player_fd);
+    sscanf(first_line,"%s %s %s %d %s %s %ld",PLID_buffer,buffer2,colours,&game_time,buffer4, buffer5,&start_time);
+    sscanf(colours,"%c%c%c%c",&C1,&C2,&C3,&C4);
+
+    if (atoi(nT_buffer) > 8){
+        fclose(player_fd);
+        storeResult(f_name, 'F');
+        sprintf(response, "RTR ENT %c %c %c %c\n",C1,C2,C3,C4);
+        return 0;
+    }
+
+    total_time = current_time-start_time;
+
+    // create a string with the guess colours
+    sprintf(guess_colours, "%c%c%c%c",C1_guess,C2_guess,C3_guess,C4_guess);
+
+    // verify if the guess is equal to some other guess
+    if (dupGuess(player_fd,guess_colours) == TRUE){
+        fclose(player_fd);
+        sprintf(response, "RTR DUP\n");
+        return 0;
+    }
+
+    fclose(player_fd);
+
+    if (gameAlreadyEnded(f_name))
+    {
+        // Game has ended (store the results)
+        storeResult(f_name, 'T');
+        sprintf(response, "RTR ETM %c %c %c %c\n",C1,C2,C3,C4);
+        return 0;
+    }
+
+    // compare the guess
+    getBlackAndWhite(&nB,&nW,colours,guess_colours);
+
+    // if exists we should open for "appending"  
+    player_fd = fopen(f_name, "a");
+
+    // write to file
+    fprintf(player_fd,"T: %c%c%c%c %d %d %d\n",C1_guess,C2_guess,C3_guess,C4_guess,nB,nW,total_time);
+
     // Build response
-    printf("PLID: %s; Colors: %c, %c, %c, %c; Trial: %s\n", PLID_buffer, C1, C2, C3, C4, nT_buffer);
-    sprintf(response, "RTR NOK\n");
+    printf("PLID: %s; Colors: %c, %c, %c, %c; Trial: %s\n", PLID_buffer, C1_guess, C2_guess, C3_guess, C4_guess, nT_buffer);
+
+    sprintf(response, "RTR OK %d %d %d\n",*trial_number,nB,nW);
+    fclose(player_fd);
+    *trial_number+=1;
 
     return 0;
 }
@@ -522,6 +627,8 @@ int main(int argc, char **argv)
     timeout.tv_usec = 0;
 
     // Main server loop
+    int trial_number = 1;
+
     while (1)
     {
         test_fds=read_fds; 
@@ -557,7 +664,7 @@ int main(int argc, char **argv)
 
         // Test for UDP connection
         else if (FD_ISSET(udp_fd, &test_fds)) {
-            UDPConnection(udp_fd, &addr);
+            UDPConnection(udp_fd, &addr,&trial_number);
         }
     }
 
