@@ -28,15 +28,18 @@ int verifyArg(char **user_args, int num_args, int idx, const char *prefix, void 
 int verboseMode(int verbose, int PLID, char *request, char *ip, char *port);
 int gameAlreadyEnded(char *file_name);
 int storeResult(char *file_name, char code);
+int getBlackAndWhite(int *nB, int *nW, char *colours, char *guess_colours);
+int getDupGuessAndTrialNumber(FILE *player_fd, char *guess_colours, bool *dup, int *trial_number);
+int startGame(char *PLID, char *time_buffer, char *colors, char mode, char *opcode);
 
 // Socket connections 
 int TCPConnection(int tcp_fd);
-int UDPConnection(int udp_fd, struct sockaddr_in *addr,int * trial_number);
+int UDPConnection(int udp_fd, struct sockaddr_in *addr);
 
 // Commands
-int commandHandler(char *client_request, char *response,int * trial_number);
+int commandHandler(char *client_request, char *response);
 int startCmd(char *client_request, char *response);
-int tryCmd(char *client_request, char *response,int * trial_number);
+int tryCmd(char *client_request, char *response);
 int quitCmd(char *client_request, char *response);
 int debugCmd(char *client_request, char *response);
 

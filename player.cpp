@@ -289,7 +289,7 @@ int tryCmd(char *arguments, char *GSIP, char *GSport, int *trial_number, int PLI
     }
     else if (!strncmp(response, "RTR DUP", 7))
     {
-        fprintf(stdout, "Secret Key guess repeats a previous trial`s guess: nB = %d, nW=%d\n", nB, nW);
+        fprintf(stdout, "Secret Key guess repeats a previous trial`s guess\n");
     }
     // Invalid trial number
     else if (!strncmp(response, "RTR INV", 7))
