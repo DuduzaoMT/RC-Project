@@ -42,7 +42,7 @@ int verboseMode(int verbose, int PLID, char *request, char *ip, char *port)
 }
 
 // TCP connection behaviour
-int TCPConnection(int tcp_fd)
+int TCPConnection(int tcp_fd, int verbose)
 {
     int nleft = 2048;
     int nread = 0;
@@ -67,6 +67,8 @@ int TCPConnection(int tcp_fd)
             break;
     }
     /* ---------------- */
+    
+    
 
     /* Writing packages */
     sprintf(server_response, "aaaaaaa");
@@ -88,9 +90,10 @@ int TCPConnection(int tcp_fd)
 }
 
 // UOP connection behaviour
-int UDPConnection(int udp_fd, sockaddr_in *addr, int *trial_number)
+int UDPConnection(int udp_fd, sockaddr_in *addr, int *trial_number, int verbose)
 {
     char client_request[GENERALSIZEBUFFER], server_response[GENERALSIZEBUFFER];
+    char PLID[7], opcode[4];
     int send;
     socklen_t addrlen = sizeof(*addr);
 
@@ -110,6 +113,11 @@ int UDPConnection(int udp_fd, sockaddr_in *addr, int *trial_number)
     printf("[UDP request]: .%s.\n", client_request);
     /* ---------------- */
 
+    sscanf(client_request, "%s %s", opcode, PLID);
+
+    if (verbose)
+        printf("[REQUEST] type: %s; PLID: %s; IP: %s:%d\n", opcode, PLID, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+    
     commandHandler(client_request, server_response);
 
     /* Writing packages */
@@ -737,13 +745,13 @@ int main(int argc, char **argv)
                 return 1;
             }
 
-            TCPConnection(new_fd);
+            TCPConnection(new_fd, verbose);
         }
 
         // Test for UDP connection
         else if (FD_ISSET(udp_fd, &test_fds))
         {
-            UDPConnection(udp_fd, &addr, &trial_number);
+            UDPConnection(udp_fd, &addr, &trial_number, verbose);
         }
     }
 

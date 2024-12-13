@@ -463,8 +463,27 @@ int showTrialsCmd(char *GSIP, char *GSport, int PLID)
 
         strcpy(f_data, response + 8 + strlen(f_name) + 1 + strlen(f_size_buffer) + 1);
 
-        printf("%s", f_data);
+        printf("File stored locally. Name: %s, Size:%s\nData:%s", f_name, f_size_buffer, f_data);
 
+        int sb_fd = open(f_name, O_WRONLY | O_CREAT | O_TRUNC, 0777);
+
+        if (sb_fd < 0)
+        {
+            free(f_data);
+            fprintf(stderr, "Couldn't create file\n");
+            return ERROR;
+        }
+
+        int bytes_written = write(sb_fd, f_data, strlen(f_data));
+        if (bytes_written < 0)
+        {
+            free(f_data);
+            close(sb_fd);
+            fprintf(stderr, "Couldn't write to file\n");
+            return ERROR;
+        }
+
+        close(sb_fd);
         free(f_data);
     }
 
@@ -509,7 +528,7 @@ int scoreBoard(char *GSIP, char *GSport)
 
         strcpy(f_data, response + 7 + strlen(f_name) + 1 + strlen(f_size_buffer) + 2);
 
-        printf("Scoreboard locally stored in: %s", f_name);
+        printf("File stored locally. Name: %s, Size:%s\nData:%s", f_name, f_size_buffer, f_data);
 
         sb_fd = open(f_name, O_WRONLY | O_CREAT | O_TRUNC, 0777);
 

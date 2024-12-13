@@ -33,8 +33,8 @@ int getDupGuessAndTrialNumber(FILE *player_fd, char *guess_colours, bool *dup, i
 int startGame(char *PLID, char *time_buffer, char *colors, char mode, char *opcode);
 
 // Socket connections 
-int TCPConnection(int tcp_fd);
-int UDPConnection(int udp_fd, struct sockaddr_in *addr);
+int TCPConnection(int tcp_fd, int verbose);
+int UDPConnection(int udp_fd, struct sockaddr_in *addr, int verbose);
 
 // Commands
 int commandHandler(char *client_request, char *response);
