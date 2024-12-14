@@ -42,6 +42,52 @@ int verboseMode(int verbose, char* PLID, char *request, char *ip, int port)
     return 0;
 }
 
+/* - General helpers - */
+void getColours(char *colours)
+{
+
+    char caracteres[] = {'R', 'G', 'B', 'Y', 'O', 'P'};
+    int tamanho_conjunto = 6;
+
+    for (int i = 0; i < 4; i++)
+    {
+        colours[i] = caracteres[rand() % tamanho_conjunto];
+    }
+
+    colours[4] = '\0';
+}
+
+int getBlackAndWhite(int *nB, int *nW, char *colours, char *guess_colours)
+{
+
+    for (int i = 0; i < 4; i++)
+    {
+
+        // right position
+        if (colours[i] == guess_colours[i])
+        {
+            colours[i] = 'X';
+            *nB += 1;
+        }
+        else
+        {
+            for (int j = 0; j < 4; j++)
+            {
+                if (guess_colours[i] == colours[j])
+                {
+                    colours[j] = 'X';
+                    *nW += 1;
+                    break;
+                }
+            }
+        }
+    }
+    return 0;
+}
+/* ------------------- */
+
+/* - Socket connections - */
+
 // TCP connection behaviour
 int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
 {
@@ -137,7 +183,9 @@ int UDPConnection(int udp_fd, sockaddr_in *addr, int *trial_number, int verbose)
 
     return 0;
 }
+/* ---------------------- */
 
+/* - File reading/writing helpers - */
 int gameAlreadyEnded(char *file_name)
 {
 
@@ -222,48 +270,6 @@ int storeResult(char *file_name, char code)
         return ERROR;
     }
 
-    return 0;
-}
-
-void getColours(char *colours)
-{
-
-    char caracteres[] = {'R', 'G', 'B', 'Y', 'O', 'P'};
-    int tamanho_conjunto = 6;
-
-    for (int i = 0; i < 4; i++)
-    {
-        colours[i] = caracteres[rand() % tamanho_conjunto];
-    }
-
-    colours[4] = '\0';
-}
-
-int getBlackAndWhite(int *nB, int *nW, char *colours, char *guess_colours)
-{
-
-    for (int i = 0; i < 4; i++)
-    {
-
-        // right position
-        if (colours[i] == guess_colours[i])
-        {
-            colours[i] = 'X';
-            *nB += 1;
-        }
-        else
-        {
-            for (int j = 0; j < 4; j++)
-            {
-                if (guess_colours[i] == colours[j])
-                {
-                    colours[j] = 'X';
-                    *nW += 1;
-                    break;
-                }
-            }
-        }
-    }
     return 0;
 }
 
@@ -426,6 +432,9 @@ int findLastGame(char *PLID, char *f_name){
     return found;
 }
 
+/* -------------------------------- */
+
+/* - Commands - */
 int commandHandler(char *client_request, char *response)
 {
 
@@ -753,6 +762,7 @@ int showTrialsCmd(char * client_request, char * response){
 
     return 0;
 }
+/* ------------ */
 
 int main(int argc, char **argv)
 {
