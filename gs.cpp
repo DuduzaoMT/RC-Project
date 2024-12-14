@@ -42,6 +42,46 @@ int verboseMode(int verbose, char* PLID, char *request, char *ip, int port)
     return 0;
 }
 
+// It assumes that the firts line was already seen
+int readFile(FILE * fd, char * f_data){
+    char first_line[GENERALSIZEBUFFER],line[GENERALSIZEBUFFER];
+    char * pointer_data = f_data;
+    char guess[5],C1,C2,C3,C4;
+    int nb,nw;
+
+     while (fgets(line, sizeof(line), fd)) {
+
+        if (strncmp(line, "T:", 2) == 0) {
+            sscanf(line, "T: %s %*d %d %d", guess, nb, nw);
+            sprintf(guess,"%c%c%c%c",&C1,&C2,&C3,&C4);
+            sprintf(line,"%c %c %c %c %d %d",C1,C2,C3,C4,nb,nw);
+            strcpy(pointer_data,line);
+            pointer_data+=strlen(line);
+        }
+        // last line of the file
+        else{
+            sprintf(f_data,"Time Remaining: 0");
+            fclose(fd);
+            return 0;   
+        }
+    }
+   
+    // TODO - COLOCAR O TEMPO QUE AINDA FALTA Na ultima linha do f_data
+
+    fclose(fd);
+    return 0;
+}
+
+long getFileSize(FILE *fd){
+    long file_size;
+
+    fseek(fd, 0, SEEK_END);
+    file_size = ftell(fd);
+    rewind(fd);
+
+    return file_size;
+}
+
 // TCP connection behaviour
 int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
 {
@@ -234,7 +274,7 @@ int commandHandler(char *client_request, char *response)
 
     if (!strcmp(opcode, "SNG"))
     {
-        if (startCmd(client_request, response) == ERR)
+        if (startCmd(client_request, response) == ERROR)
         {
             fprintf(stderr, "Error starting game\n");
             sprintf(response, "RSG ERR\n");
@@ -250,7 +290,7 @@ int commandHandler(char *client_request, char *response)
     }
     else if (!strcmp(opcode, "QUT"))
     {
-        if (quitCmd(client_request, response) == ERR)
+        if (quitCmd(client_request, response) == ERROR)
         {
             fprintf(stderr, "Error in quit\n");
             sprintf(response, "RQT ERR\n");
@@ -258,7 +298,7 @@ int commandHandler(char *client_request, char *response)
     }
     else if (!strcmp(opcode, "DBG"))
     {
-        if (debugCmd(client_request, response) == ERR)
+        if (debugCmd(client_request, response) == ERROR)
         {
             fprintf(stderr, "Error in debug\n");
             sprintf(response, "RQT ERR\n");
@@ -266,7 +306,7 @@ int commandHandler(char *client_request, char *response)
     }
     else if (!strcmp(opcode, "STR"))
     {
-        if (showTrialsCmd(client_request, response) == ERR)
+        if (showTrialsCmd(client_request, response) == ERROR)
         {
             fprintf(stderr, "Error in show trials\n");
             sprintf(response, "RST NOK\n");
@@ -413,14 +453,14 @@ int startCmd(char *client_request, char *response)
     if (sscanf(client_request, "SNG %s %s\n", PLID_buffer, time_buffer) != 2)
     {
         fprintf(stderr, "Invalid arguments\n");
-        return ERR;
+        return ERROR;
     };
 
     // Verify the arguments
     if (verifyStartCmd(PLID_buffer, time_buffer) == ERROR)
     {
         fprintf(stderr, "Invalid arguments\n");
-        return ERR;
+        return ERROR;
     }
 
     getColours(colors);
@@ -621,6 +661,7 @@ int showTrialsCmd(char * client_request, char * response){
     char PLID_buffer[USERINPUTBUFFER],f_name[GENERALSIZEBUFFER];
     char opcode[4];
     bool found = false;
+    long file_size;
     FILE * player_fd;
 
     if (sscanf(client_request, "STR %s\n", PLID_buffer) != 1 || strlen(client_request) != 11)
@@ -638,19 +679,30 @@ int showTrialsCmd(char * client_request, char * response){
     sprintf(f_name, "GAMES/GAME_%s.txt", PLID_buffer);
 
     player_fd = fopen(f_name, "r");
+    
     // player dont have an ongoing game
     if(player_fd == NULL){
         sprintf(opcode,"FIN");
+
+        // change to player directory
+        sprintf(f_name, "GAMES/%s", PLID_buffer);
+
         // search for an endend game
+
         if(!found){
-            sprintf(opcode,"NOK");
+            return ERROR;
         }
+        file_size = getFileSize(player_fd);
+
     }
     else{
         sprintf(opcode,"ACT");
+
+        file_size = getFileSize(player_fd);
+
     }
 
-    sprintf(response, "RST %s",opcode);
+    sprintf(response, "RST %s %ld",opcode,f_name,file_size);
 
     return 0;
 }
