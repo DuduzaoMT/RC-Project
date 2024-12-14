@@ -529,9 +529,9 @@ int scoreBoard(char *GSIP, char *GSport)
 
         f_data = (char *)malloc(atoi(f_size_buffer) * sizeof(char) + 1);
 
-        strcpy(f_data, response + 7 + strlen(f_name) + 1 + strlen(f_size_buffer) + 2);
+        strcpy(f_data, response + 7 + strlen(f_name) + 1 + strlen(f_size_buffer) + 1);
 
-        printf("File stored locally. Name: %s, Size:%s\nData:%s", f_name, f_size_buffer, f_data);
+        printf("File stored locally. Name: %s, Size:%s\nData:\n%s", f_name, f_size_buffer, f_data);
 
         sb_fd = open(f_name, O_WRONLY | O_CREAT | O_TRUNC, 0777);
 

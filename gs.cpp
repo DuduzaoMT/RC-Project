@@ -3,6 +3,8 @@
 
 using namespace std;
 
+int scoreboard_id = 0;
+
 // Verifies user arguments
 int verifyArg(char **user_args, int num_args, int idx, const char *prefix, void *arg_to_change, const void *default_val, bool single_argument)
 {
@@ -29,7 +31,7 @@ int verifyArg(char **user_args, int num_args, int idx, const char *prefix, void 
 }
 
 // Verbose mode
-int verboseMode(int verbose, char* PLID, char *request, char *ip, int port)
+int verboseMode(int verbose, char *PLID, char *request, char *ip, int port)
 {
     if (!verbose)
         return 1;
@@ -96,7 +98,7 @@ int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
     int nwritten = 0;
     char buffer[GENERALSIZEBUFFER], client_request[GENERALSIZEBUFFER], server_response[GENERALSIZEBUFFER];
     char *last_digit_pointer = client_request;
-    char PLID[10],opcode[4];
+    char PLID[10], opcode[4];
 
     memset(client_request, 0, sizeof(client_request));
     memset(server_response, 0, sizeof(server_response));
@@ -115,11 +117,12 @@ int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
             break;
     }
     /* ---------------- */
-    if(sscanf(client_request, "%*s %s", PLID) != 1){
-        strcpy(PLID,"Unknown");
+    if (sscanf(client_request, "%*s %s", PLID) != 1)
+    {
+        strcpy(PLID, "Unknown");
     }
-    
-    verboseMode(verbose,PLID,client_request,inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+
+    verboseMode(verbose, PLID, client_request, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
 
     commandHandler(client_request, server_response);
 
@@ -167,8 +170,8 @@ int UDPConnection(int udp_fd, sockaddr_in *addr, int *trial_number, int verbose)
 
     sscanf(client_request, "%s %s", opcode, PLID);
 
-    verboseMode(verbose,PLID,client_request,inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
-    
+    verboseMode(verbose, PLID, client_request, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+
     commandHandler(client_request, server_response);
 
     /* Writing packages */
@@ -296,7 +299,8 @@ int getDupGuessAndTrialNumber(FILE *player_fd, char *guess_colours, bool *dup, i
 }
 
 // Stars a game
-int startGame(char *PLID, char *time_buffer, char *colors, char mode, char *opcode){
+int startGame(char *PLID, char *time_buffer, char *colors, char mode, char *opcode)
+{
 
     FILE *player_fd;
     int total_time;
@@ -354,11 +358,12 @@ int startGame(char *PLID, char *time_buffer, char *colors, char mode, char *opco
 }
 
 // Gets the trials made in a game
-int readTrials(char *f_name, char *f_data, int active_game){
-    char buffer[GENERALSIZEBUFFER],line[GENERALSIZEBUFFER];
+int readTrials(char *f_name, char *f_data, int active_game)
+{
+    char buffer[GENERALSIZEBUFFER], line[GENERALSIZEBUFFER];
     char *pointer_data;
-    char C1,C2,C3,C4;
-    int nb,nw;
+    char C1, C2, C3, C4;
+    int nb, nw;
     time_t current_time = 0, start_time = 0;
     int total_time, remaining_time;
 
@@ -368,34 +373,36 @@ int readTrials(char *f_name, char *f_data, int active_game){
     memset(buffer, 0, sizeof(buffer));
 
     pointer_data = f_data;
-    
+
     FILE *fd = fopen(f_name, "r");
 
     // Reads first line
     fgets(buffer, sizeof(buffer), fd);
     sscanf(buffer, "%*s %*s %*s %d %*s %*s %ld", &total_time, &start_time);
 
-    while (fgets(buffer, sizeof(buffer), fd)) {
+    while (fgets(buffer, sizeof(buffer), fd))
+    {
 
-        if (strncmp(buffer, "T:", 2) == 0) {
+        if (strncmp(buffer, "T:", 2) == 0)
+        {
             sscanf(buffer, "T: %c%c%c%c %d %d", &C1, &C2, &C3, &C4, &nb, &nw);
-            sprintf(line,"%c %c %c %c %d %d\n",C1,C2,C3,C4,nb,nw);
-            strcpy(pointer_data,line);
-            pointer_data+=strlen(line);
+            sprintf(line, "%c %c %c %c %d %d\n", C1, C2, C3, C4, nb, nw);
+            strcpy(pointer_data, line);
+            pointer_data += strlen(line);
         }
     }
 
     remaining_time = total_time - (current_time - start_time);
     if (remaining_time > 0)
     {
-        sprintf(line,"%d",remaining_time);
-        strcpy(pointer_data,line);
+        sprintf(line, "%d", remaining_time);
+        strcpy(pointer_data, line);
         fclose(fd);
     }
     else
     {
-        sprintf(line,"Game already finished");
-        strcpy(pointer_data,line);
+        sprintf(line, "Game already finished");
+        strcpy(pointer_data, line);
         fclose(fd);
         // If the game was still active, store the results
         if (active_game)
@@ -405,7 +412,8 @@ int readTrials(char *f_name, char *f_data, int active_game){
 }
 
 // Gets the last game played by a player
-int findLastGame(char *PLID, char *f_name){
+int findLastGame(char *PLID, char *f_name)
+{
     struct dirent **filelist;
     int nentries, found;
     char dirname[20];
@@ -418,13 +426,18 @@ int findLastGame(char *PLID, char *f_name){
     found = 0;
 
     // Check if the directory is empty
-    if (nentries <= 0) {
+    if (nentries <= 0)
+    {
         return 0;
-    } else {
+    }
+    else
+    {
 
-        while (nentries--) {
+        while (nentries--)
+        {
             // Ignore hidden files
-            if (filelist[nentries]->d_name[0] != '.' && !found) {
+            if (filelist[nentries]->d_name[0] != '.' && !found)
+            {
                 // Format the file name
                 sprintf(f_name, "GAMES/%s/%s", PLID, filelist[nentries]->d_name);
                 found = 1;
@@ -437,11 +450,12 @@ int findLastGame(char *PLID, char *f_name){
     return found;
 }
 
-int addScore(char *f_name){
-    
+int addScore(char *f_name)
+{
+
     char buffer[GENERALSIZEBUFFER], time_str[USERINPUTBUFFER], new_file_name[GENERALSIZEBUFFER];
     char PLID[7], mode_full[6], colors[5], mode_char;
-    int num_tries = 0, score = 0;
+    int num_tries = -1, score = 0;
     time_t fulltime;
     struct tm *current_time;
 
@@ -454,17 +468,17 @@ int addScore(char *f_name){
         strcpy(mode_full, "PLAY");
     else
         strcpy(mode_full, "DEBUG");
-    
+
     // Count the number of tries needed to win
-    while (fgets(buffer, sizeof(buffer), fd)) 
+    while (fgets(buffer, sizeof(buffer), fd))
         if (strncmp(buffer, "T:", 2) == 0)
             num_tries++;
-    
+
     fclose(fd);
 
-    // Calculate the score 
+    // Calculate the score
     score = ((MAXTRIES - num_tries) * 100) / MAXTRIES;
-    
+
     // Get current time
     time(&fulltime);
     current_time = gmtime(&fulltime);
@@ -476,8 +490,52 @@ int addScore(char *f_name){
     fd = fopen(new_file_name, "w");
     fprintf(fd, "%03d %s %s %d %s\n", score, PLID, colors, num_tries, mode_full);
     fclose(fd);
-    
+
     return 0;
+}
+
+// Reads the top 10 scores and returns the number of entries
+int findTopScores(Scorelist *list) {
+    struct dirent **filelist;
+    int nentries, ifile;
+    char fname[300];
+    FILE *fp;
+    char mode[8];
+
+    // Get the list of files in the directory
+    nentries = scandir("SCORES/", &filelist, 0, alphasort);
+    if (nentries <= 0) {
+        return 0; // No files found
+    } else {
+        ifile = 0;
+
+        while (nentries--) {
+            // Ignore hidden files and limit to 10 entries
+            if (filelist[nentries]->d_name[0] != '.' && ifile < 10) {
+                sprintf(fname, "SCORES/%s", filelist[nentries]->d_name);
+
+                fp = fopen(fname, "r");
+                if (fp != NULL) {
+                    fscanf(fp, "%d %s %s %d %s",
+                           &list->score[ifile],
+                           list->PLID[ifile],
+                           list->colors[ifile],
+                           &list->num_tries[ifile],
+                           mode);
+
+                    strcpy(list->mode[ifile], mode);
+
+                    fclose(fp);
+                    ++ifile;    
+                }
+            }
+            free(filelist[nentries]); 
+        }
+        free(filelist); 
+    }
+
+    list->nscores = ifile; 
+    return ifile;          
 }
 
 /* -------------------------------- */
@@ -531,7 +589,11 @@ int commandHandler(char *client_request, char *response)
     }
     else if (!strcmp(opcode, "SSB"))
     {
-        /* code */
+        if (scoreboardCmd(client_request, response) == ERROR)
+        {
+            fprintf(stderr, "Error in scoreboard\n");
+            sprintf(response, "RST NOK\n");
+        }
     }
     else
     {
@@ -685,7 +747,7 @@ int tryCmd(char *client_request, char *response)
         addScore(f_name);
         storeResult(f_name, 'W');
     }
-    
+
     sprintf(response, "RTR OK %d %d %d\n", trial_number, nB, nW);
 
     return 0;
@@ -756,13 +818,14 @@ int debugCmd(char *client_request, char *response)
     return 0;
 }
 
-int showTrialsCmd(char * client_request, char * response){
+int showTrialsCmd(char *client_request, char *response)
+{
 
-    char PLID_buffer[USERINPUTBUFFER],f_name[GENERALSIZEBUFFER],f_data[GENERALSIZEBUFFER];
+    char PLID_buffer[USERINPUTBUFFER], f_name[GENERALSIZEBUFFER], f_data[GENERALSIZEBUFFER];
     char opcode[4];
     bool found = false;
     long f_size;
-    FILE * player_fd;
+    FILE *player_fd;
 
     if (sscanf(client_request, "STR %s\n", PLID_buffer) != 1 || strlen(client_request) != 11)
     {
@@ -779,36 +842,69 @@ int showTrialsCmd(char * client_request, char * response){
     sprintf(f_name, "GAMES/GAME_%s.txt", PLID_buffer);
 
     player_fd = fopen(f_name, "r");
-    
-    if(player_fd == NULL){
+
+    if (player_fd == NULL)
+    {
         // Player doesn't have an ongoing game
-        sprintf(opcode,"FIN");
+        sprintf(opcode, "FIN");
 
         // Find the last game
-        found = findLastGame(PLID_buffer,f_name);
+        found = findLastGame(PLID_buffer, f_name);
 
-        if(!found){
+        if (!found)
+        {
             return ERROR;
         }
 
-        readTrials(f_name,f_data,false);
+        readTrials(f_name, f_data, false);
         f_size = strlen(f_data);
-
     }
-    else{
+    else
+    {
         // Player has an ongoing game
-        sprintf(opcode,"ACT");
+        sprintf(opcode, "ACT");
 
         fclose(player_fd);
 
-        readTrials(f_name,f_data,true);
+        readTrials(f_name, f_data, true);
         f_size = strlen(f_data);
-
     }
 
     sprintf(f_name, "STATE_%s.txt", PLID_buffer);
 
-    sprintf(response, "RST %s %s %ld %s\n",opcode,f_name,f_size,f_data);
+    sprintf(response, "RST %s %s %ld %s\n", opcode, f_name, f_size, f_data);
+
+    return 0;
+}
+
+int scoreboardCmd(char *client_request, char *response)
+{
+    char line[GENERALSIZEBUFFER], f_data[GENERALSIZEBUFFER], *current_char, f_name[USERINPUTBUFFER];
+    Scorelist list;
+    int num_entries, f_size;
+
+    current_char = f_data;
+
+    num_entries = findTopScores(&list);
+
+    if (num_entries == 0)
+    {
+        sprintf(response, "RSS EMPTY\n");
+        return 0;
+    }
+
+    for (int i = 0; i < num_entries; i++)
+    {
+        sprintf(line, "%03d %s %s %d %s\n", list.score[i], list.PLID[i], list.colors[i], list.num_tries[i], list.mode[i]);
+        strcpy(current_char, line);
+        current_char += strlen(line);
+    }
+    
+    f_size = strlen(f_data);
+
+    sprintf(f_name, "TOPSCORES_%d.txt", scoreboard_id++);
+
+    sprintf(response, "RSS OK %s %d %s", f_name, f_size, f_data);
 
     return 0;
 }
@@ -880,7 +976,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (setsockopt(tcp_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
+    if (setsockopt(tcp_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)))
+    {
         perror("setsockopt");
         exit(EXIT_FAILURE);
     }
@@ -958,7 +1055,7 @@ int main(int argc, char **argv)
                 return 1;
             }
 
-            TCPConnection(new_fd, verbose,&addr);
+            TCPConnection(new_fd, verbose, &addr);
         }
 
         // Test for UDP connection
