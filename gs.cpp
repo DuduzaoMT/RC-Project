@@ -42,46 +42,6 @@ int verboseMode(int verbose, char* PLID, char *request, char *ip, int port)
     return 0;
 }
 
-// It assumes that the firts line was already seen
-int readFile(FILE * fd, char * f_data){
-    char first_line[GENERALSIZEBUFFER],line[GENERALSIZEBUFFER];
-    char * pointer_data = f_data;
-    char guess[5],C1,C2,C3,C4;
-    int nb,nw;
-
-     while (fgets(line, sizeof(line), fd)) {
-
-        if (strncmp(line, "T:", 2) == 0) {
-            sscanf(line, "T: %s %*d %d %d", guess, nb, nw);
-            sprintf(guess,"%c%c%c%c",&C1,&C2,&C3,&C4);
-            sprintf(line,"%c %c %c %c %d %d",C1,C2,C3,C4,nb,nw);
-            strcpy(pointer_data,line);
-            pointer_data+=strlen(line);
-        }
-        // last line of the file
-        else{
-            sprintf(f_data,"Time Remaining: 0");
-            fclose(fd);
-            return 0;   
-        }
-    }
-   
-    // TODO - COLOCAR O TEMPO QUE AINDA FALTA Na ultima linha do f_data
-
-    fclose(fd);
-    return 0;
-}
-
-long getFileSize(FILE *fd){
-    long file_size;
-
-    fseek(fd, 0, SEEK_END);
-    file_size = ftell(fd);
-    rewind(fd);
-
-    return file_size;
-}
-
 // TCP connection behaviour
 int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
 {
@@ -110,7 +70,7 @@ int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
     }
     /* ---------------- */
     if(sscanf(client_request, "%*s %s", PLID) != 1){
-        strcpy(PLID,"UnKnown");
+        strcpy(PLID,"Unknown");
     }
     
     verboseMode(verbose,PLID,client_request,inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
@@ -118,7 +78,6 @@ int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
     commandHandler(client_request, server_response);
 
     /* Writing packages */
-    sprintf(server_response, "aaaaaaa");
     nleft = strlen(server_response);
     last_digit_pointer = server_response;
     printf("[TCP package Write]: .%s.\n", server_response);
@@ -136,7 +95,7 @@ int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
     return 0;
 }
 
-// UOP connection behaviour
+// UDP connection behaviour
 int UDPConnection(int udp_fd, sockaddr_in *addr, int *trial_number, int verbose)
 {
     char client_request[GENERALSIZEBUFFER], server_response[GENERALSIZEBUFFER];
@@ -266,64 +225,6 @@ int storeResult(char *file_name, char code)
     return 0;
 }
 
-int commandHandler(char *client_request, char *response)
-{
-
-    char opcode[4];
-    strncpy(opcode, client_request, 3);
-
-    if (!strcmp(opcode, "SNG"))
-    {
-        if (startCmd(client_request, response) == ERROR)
-        {
-            fprintf(stderr, "Error starting game\n");
-            sprintf(response, "RSG ERR\n");
-        }
-    }
-    else if (!strcmp(opcode, "TRY"))
-    {
-        if (tryCmd(client_request, response) == ERROR)
-        {
-            fprintf(stderr, "Error in try\n");
-            sprintf(response, "RTR ERR\n");
-        }
-    }
-    else if (!strcmp(opcode, "QUT"))
-    {
-        if (quitCmd(client_request, response) == ERROR)
-        {
-            fprintf(stderr, "Error in quit\n");
-            sprintf(response, "RQT ERR\n");
-        }
-    }
-    else if (!strcmp(opcode, "DBG"))
-    {
-        if (debugCmd(client_request, response) == ERROR)
-        {
-            fprintf(stderr, "Error in debug\n");
-            sprintf(response, "RQT ERR\n");
-        }
-    }
-    else if (!strcmp(opcode, "STR"))
-    {
-        if (showTrialsCmd(client_request, response) == ERROR)
-        {
-            fprintf(stderr, "Error in show trials\n");
-            sprintf(response, "RST NOK\n");
-        }
-    }
-    else if (!strcmp(opcode, "SSB"))
-    {
-        /* code */
-    }
-    else
-    {
-        fprintf(stderr, "Invalid command\n");
-    }
-
-    return 0;
-}
-
 void getColours(char *colours)
 {
 
@@ -443,6 +344,146 @@ int startGame(char *PLID, char *time_buffer, char *colors, char mode, char *opco
     return 0;
 }
 
+int readTrials(char *f_name, char *f_data, int active_game){
+    char buffer[GENERALSIZEBUFFER],line[GENERALSIZEBUFFER];
+    char *pointer_data;
+    char C1,C2,C3,C4;
+    int nb,nw;
+    time_t current_time = 0, start_time = 0;
+    int total_time, remaining_time;
+
+    time(&current_time);
+
+    memset(f_data, 0, sizeof(f_data));
+    memset(buffer, 0, sizeof(buffer));
+
+    pointer_data = f_data;
+    
+    FILE *fd = fopen(f_name, "r");
+
+    // Reads first line
+    fgets(buffer, sizeof(buffer), fd);
+    sscanf(buffer, "%*s %*s %*s %d %*s %*s %ld", &total_time, &start_time);
+
+    while (fgets(buffer, sizeof(buffer), fd)) {
+
+        if (strncmp(buffer, "T:", 2) == 0) {
+            sscanf(buffer, "T: %c%c%c%c %d %d", &C1, &C2, &C3, &C4, &nb, &nw);
+            sprintf(line,"%c %c %c %c %d %d\n",C1,C2,C3,C4,nb,nw);
+            strcpy(pointer_data,line);
+            pointer_data+=strlen(line);
+        }
+    }
+
+    remaining_time = total_time - (current_time - start_time);
+    if (remaining_time > 0)
+    {
+        sprintf(line,"%d",remaining_time);
+        strcpy(pointer_data,line);
+        fclose(fd);
+    }
+    else
+    {
+        sprintf(line,"Game already finished");
+        strcpy(pointer_data,line);
+        fclose(fd);
+        // If the game was still active, store the results
+        if (active_game)
+            storeResult(f_name, 'T');
+    }
+    return 0;
+}
+
+int findLastGame(char *PLID, char *f_name){
+    struct dirent **filelist;
+    int nentries, found;
+    char dirname[20];
+
+    // Format directory name
+    sprintf(dirname, "GAMES/%s/", PLID);
+
+    // Read the directory and order it alphabetically
+    nentries = scandir(dirname, &filelist, 0, alphasort);
+    found = 0;
+
+    // Check if the directory is empty
+    if (nentries <= 0) {
+        return 0;
+    } else {
+
+        while (nentries--) {
+            // Ignore hidden files
+            if (filelist[nentries]->d_name[0] != '.' && !found) {
+                // Format the file name
+                sprintf(f_name, "GAMES/%s/%s", PLID, filelist[nentries]->d_name);
+                found = 1;
+            }
+            free(filelist[nentries]);
+        }
+        free(filelist);
+    }
+
+    return found;
+}
+
+int commandHandler(char *client_request, char *response)
+{
+
+    char opcode[4];
+    strncpy(opcode, client_request, 3);
+
+    if (!strcmp(opcode, "SNG"))
+    {
+        if (startCmd(client_request, response) == ERROR)
+        {
+            fprintf(stderr, "Error starting game\n");
+            sprintf(response, "RSG ERR\n");
+        }
+    }
+    else if (!strcmp(opcode, "TRY"))
+    {
+        if (tryCmd(client_request, response) == ERROR)
+        {
+            fprintf(stderr, "Error in try\n");
+            sprintf(response, "RTR ERR\n");
+        }
+    }
+    else if (!strcmp(opcode, "QUT"))
+    {
+        if (quitCmd(client_request, response) == ERROR)
+        {
+            fprintf(stderr, "Error in quit\n");
+            sprintf(response, "RQT ERR\n");
+        }
+    }
+    else if (!strcmp(opcode, "DBG"))
+    {
+        if (debugCmd(client_request, response) == ERROR)
+        {
+            fprintf(stderr, "Error in debug\n");
+            sprintf(response, "RQT ERR\n");
+        }
+    }
+    else if (!strcmp(opcode, "STR"))
+    {
+        if (showTrialsCmd(client_request, response) == ERROR)
+        {
+            fprintf(stderr, "Error in show trials\n");
+            sprintf(response, "RST NOK\n");
+        }
+    }
+    else if (!strcmp(opcode, "SSB"))
+    {
+        /* code */
+    }
+    else
+    {
+        fprintf(stderr, "Invalid command\n");
+    }
+
+    return 0;
+}
+
 int startCmd(char *client_request, char *response)
 {
     char PLID_buffer[USERINPUTBUFFER], time_buffer[USERINPUTBUFFER], colors[5], opcode[4];
@@ -510,7 +551,7 @@ int tryCmd(char *client_request, char *response)
     sprintf(f_name, "GAMES/GAME_%s.txt", PLID_buffer);
 
     // Check if the game has ended
-    if (gameAlreadyEnded(f_name))
+    if (gameAlreadyEnded(f_name) == true)
     {
         // Game has ended (store the results)
         storeResult(f_name, 'T');
@@ -658,10 +699,10 @@ int debugCmd(char *client_request, char *response)
 
 int showTrialsCmd(char * client_request, char * response){
 
-    char PLID_buffer[USERINPUTBUFFER],f_name[GENERALSIZEBUFFER];
+    char PLID_buffer[USERINPUTBUFFER],f_name[GENERALSIZEBUFFER],f_data[GENERALSIZEBUFFER];
     char opcode[4];
     bool found = false;
-    long file_size;
+    long f_size;
     FILE * player_fd;
 
     if (sscanf(client_request, "STR %s\n", PLID_buffer) != 1 || strlen(client_request) != 11)
@@ -680,36 +721,42 @@ int showTrialsCmd(char * client_request, char * response){
 
     player_fd = fopen(f_name, "r");
     
-    // player dont have an ongoing game
     if(player_fd == NULL){
+        // Player doesn't have an ongoing game
         sprintf(opcode,"FIN");
 
-        // change to player directory
-        sprintf(f_name, "GAMES/%s", PLID_buffer);
-
-        // search for an endend game
+        // Find the last game
+        found = findLastGame(PLID_buffer,f_name);
 
         if(!found){
             return ERROR;
         }
-        file_size = getFileSize(player_fd);
+
+        readTrials(f_name,f_data,false);
+        f_size = strlen(f_data);
 
     }
     else{
+        // Player has an ongoing game
         sprintf(opcode,"ACT");
 
-        file_size = getFileSize(player_fd);
+        fclose(player_fd);
+
+        readTrials(f_name,f_data,true);
+        f_size = strlen(f_data);
 
     }
 
-    sprintf(response, "RST %s %ld",opcode,f_name,file_size);
+    sprintf(f_name, "STATE_%s.txt", PLID_buffer);
+
+    sprintf(response, "RST %s %s %ld %s\n",opcode,f_name,f_size,f_data);
 
     return 0;
 }
 
 int main(int argc, char **argv)
 {
-    int udp_fd, tcp_fd, errcode;
+    int udp_fd, tcp_fd, errcode, opt = 1;
     ssize_t n;
     socklen_t addrlen;
     timeval timeout;
@@ -773,6 +820,11 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    if (setsockopt(tcp_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
+
     // Localhost configuration
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;      // IPv4
@@ -819,7 +871,6 @@ int main(int argc, char **argv)
     {
         test_fds = read_fds;
         memset((void *)&timeout, 0, sizeof(timeout));
-        //memset(&addr, 0, sizeof(addr));
         timeout.tv_sec = 10;
 
         int ready = select(FD_SETSIZE, &test_fds, (fd_set *)NULL, (fd_set *)NULL, &timeout);

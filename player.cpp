@@ -3,6 +3,8 @@
 
 using namespace std;
 
+int ingame = false;
+
 // Verifies the arguments of the program once it is called
 int verifyArg(char **user_args, int idx, const char *prefix, char *arg_to_change, const char *default_val)
 {
@@ -243,6 +245,7 @@ int startCmd(char *arguments, char *GSIP, char *GSport, int *PLID, int *max_play
     else
         return ERROR;
 
+    ingame = true;
     (*trial_number) = 1;
     (*PLID) = new_PLID;
     (*max_playtime) = new_max_playtime;
@@ -356,9 +359,8 @@ int exitCmd(char *GSIP, char *GSport, int PLID)
     char C1, C2, C3, C4;
     char request[GENERALSIZEBUFFER], response[GENERALSIZEBUFFER];
 
-    if (PLID != -1)
+    if (ingame)
     {
-
         sprintf(request, "QUT %06d\n", PLID);
 
         if (UDPInteraction(request, response, GSIP, GSport))
@@ -425,6 +427,7 @@ int debugCmd(char *arguments, char *GSIP, char *GSport, int *PLID, int *max_play
     else
         return ERROR;
 
+    ingame = true;
     (*trial_number) = 1;
     (*PLID) = new_PLID;
     (*max_playtime) = new_max_playtime;
@@ -463,7 +466,7 @@ int showTrialsCmd(char *GSIP, char *GSport, int PLID)
 
         strcpy(f_data, response + 8 + strlen(f_name) + 1 + strlen(f_size_buffer) + 1);
 
-        printf("File stored locally. Name: %s, Size:%s\nData:%s", f_name, f_size_buffer, f_data);
+        printf("File stored locally. Name: %s, Size:%s\nData:\n%s", f_name, f_size_buffer, f_data);
 
         int sb_fd = open(f_name, O_WRONLY | O_CREAT | O_TRUNC, 0777);
 
@@ -562,7 +565,6 @@ int main(int argc, char **argv)
     char GSport[MAXPORTSIZE] = PORT;
 
     int trial_number = 1;
-    int exit_application = false;
     int PLID = UNKNOWN;
     int max_playtime = UNKNOWN;
 
@@ -596,11 +598,8 @@ int main(int argc, char **argv)
     printf("IP: %s\nPort: %s\n", GSIP, GSport);
 
     // Player controller
-
-    while (exit_application != true)
+    while (1)
     {
-        // printf("-----\nPLID atual: %d\ntrial_number atual: %d\nmax_playtime atual: %d\n-----\n", PLID, trial_number, max_playtime);
-
         char command[USERINPUTBUFFER], arguments[USERINPUTBUFFER];
         scanf("%s", command);
 
@@ -621,7 +620,7 @@ int main(int argc, char **argv)
                     fprintf(stderr, "Try command error\n");
                 else if (command_status == RESTART)
                 {
-                    PLID = UNKNOWN;
+                    ingame = 0;
                     trial_number = 1;
                     max_playtime = UNKNOWN;
                 }
@@ -648,7 +647,7 @@ int main(int argc, char **argv)
                     fprintf(stderr, "Show trials command error\n");
                 else if (command_status == RESTART)
                 {
-                    PLID = UNKNOWN;
+                    ingame = 0;
                     trial_number = 1;
                     max_playtime = UNKNOWN;
                 }
@@ -661,7 +660,7 @@ int main(int argc, char **argv)
                     fprintf(stderr, "Quit command error\n");
                 else if (command_status == RESTART)
                 {
-                    PLID = UNKNOWN;
+                    ingame = 0;
                     trial_number = 1;
                     max_playtime = UNKNOWN;
                 }
@@ -669,11 +668,12 @@ int main(int argc, char **argv)
 
             else if (!strcmp(command, "exit"))
             {
-                exit_application = exitCmd(GSIP, GSport, PLID);
-                if (exit_application == ERROR)
+                command_status = exitCmd(GSIP, GSport, PLID);
+                if (command_status == ERROR)
                 {
                     fprintf(stderr, "Exit command error\n");
                 }
+                break;
             }
             else
             {

@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <filesystem>
+#include <dirent.h>
 
 /* - Constants - */
 #define VERBOSEPREFIX "-v\0"    // Verbose mode prefix
