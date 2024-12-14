@@ -42,7 +42,7 @@ int startCmd(char *client_request, char *response);
 int tryCmd(char *client_request, char *response);
 int quitCmd(char *client_request, char *response);
 int debugCmd(char *client_request, char *response);
-
+int showTrialsCmd(char * client_request, char * response);
 /* ------------- */
 
 #endif

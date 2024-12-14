@@ -29,26 +29,28 @@ int verifyArg(char **user_args, int num_args, int idx, const char *prefix, void 
 }
 
 // Verbose mode
-int verboseMode(int verbose, int PLID, char *request, char *ip, char *port)
+int verboseMode(int verbose, char* PLID, char *request, char *ip, int port)
 {
     if (!verbose)
         return 1;
 
     char clean_request[GENERALSIZEBUFFER];
     strncpy(clean_request, request, strlen(request) - 1);
+    clean_request[strlen(request) - 1] = '\0';
 
-    printf("[REQUEST]: %s, originated from: %s:%s, player id: %d\n", clean_request, ip, port, PLID);
+    printf("[REQUEST]: %s, originated from: %s:%d, player id: %s\n", clean_request, ip, port, PLID);
     return 0;
 }
 
 // TCP connection behaviour
-int TCPConnection(int tcp_fd, int verbose)
+int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
 {
     int nleft = 2048;
     int nread = 0;
     int nwritten = 0;
     char buffer[GENERALSIZEBUFFER], client_request[GENERALSIZEBUFFER], server_response[GENERALSIZEBUFFER];
     char *last_digit_pointer = client_request;
+    char PLID[10],opcode[4];
 
     memset(client_request, 0, sizeof(client_request));
     memset(server_response, 0, sizeof(server_response));
@@ -67,8 +69,13 @@ int TCPConnection(int tcp_fd, int verbose)
             break;
     }
     /* ---------------- */
+    if(sscanf(client_request, "%*s %s", PLID) != 1){
+        strcpy(PLID,"UnKnown");
+    }
     
-    
+    verboseMode(verbose,PLID,client_request,inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+
+    commandHandler(client_request, server_response);
 
     /* Writing packages */
     sprintf(server_response, "aaaaaaa");
@@ -115,8 +122,7 @@ int UDPConnection(int udp_fd, sockaddr_in *addr, int *trial_number, int verbose)
 
     sscanf(client_request, "%s %s", opcode, PLID);
 
-    if (verbose)
-        printf("[REQUEST] type: %s; PLID: %s; IP: %s:%d\n", opcode, PLID, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+    verboseMode(verbose,PLID,client_request,inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
     
     commandHandler(client_request, server_response);
 
@@ -260,7 +266,11 @@ int commandHandler(char *client_request, char *response)
     }
     else if (!strcmp(opcode, "STR"))
     {
-        /* code */
+        if (showTrialsCmd(client_request, response) == ERR)
+        {
+            fprintf(stderr, "Error in show trials\n");
+            sprintf(response, "RST NOK\n");
+        }
     }
     else if (!strcmp(opcode, "SSB"))
     {
@@ -606,6 +616,45 @@ int debugCmd(char *client_request, char *response)
     return 0;
 }
 
+int showTrialsCmd(char * client_request, char * response){
+
+    char PLID_buffer[USERINPUTBUFFER],f_name[GENERALSIZEBUFFER];
+    char opcode[4];
+    bool found = false;
+    FILE * player_fd;
+
+    if (sscanf(client_request, "STR %s\n", PLID_buffer) != 1 || strlen(client_request) != 11)
+    {
+        fprintf(stderr, "Invalid sintax\n");
+        return ERROR;
+    }
+
+    if (strlen(PLID_buffer) != 6 || !isNumber(PLID_buffer))
+    {
+        fprintf(stderr, "Invalid PLID\n");
+        return ERROR;
+    }
+
+    sprintf(f_name, "GAMES/GAME_%s.txt", PLID_buffer);
+
+    player_fd = fopen(f_name, "r");
+    // player dont have an ongoing game
+    if(player_fd == NULL){
+        sprintf(opcode,"FIN");
+        // search for an endend game
+        if(!found){
+            sprintf(opcode,"NOK");
+        }
+    }
+    else{
+        sprintf(opcode,"ACT");
+    }
+
+    sprintf(response, "RST %s",opcode);
+
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     int udp_fd, tcp_fd, errcode;
@@ -678,7 +727,7 @@ int main(int argc, char **argv)
     hints.ai_socktype = INADDR_ANY; // Sockets
     hints.ai_flags = AI_PASSIVE;
 
-    errcode = getaddrinfo(NULL, PORT, &hints, &res);
+    errcode = getaddrinfo(NULL, GSport, &hints, &res);
     if (errcode != 0)
     {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(errcode));
@@ -718,6 +767,7 @@ int main(int argc, char **argv)
     {
         test_fds = read_fds;
         memset((void *)&timeout, 0, sizeof(timeout));
+        //memset(&addr, 0, sizeof(addr));
         timeout.tv_sec = 10;
 
         int ready = select(FD_SETSIZE, &test_fds, (fd_set *)NULL, (fd_set *)NULL, &timeout);
@@ -745,7 +795,7 @@ int main(int argc, char **argv)
                 return 1;
             }
 
-            TCPConnection(new_fd, verbose);
+            TCPConnection(new_fd, verbose,&addr);
         }
 
         // Test for UDP connection

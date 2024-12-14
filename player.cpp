@@ -606,7 +606,6 @@ int main(int argc, char **argv)
 
         if (fgets(arguments, sizeof(arguments), stdin))
         {
-
             // commands with arguments
             if (!strcmp(command, "start"))
             {
