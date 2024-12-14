@@ -186,9 +186,9 @@ int UDPConnection(int udp_fd, sockaddr_in *addr, int *trial_number, int verbose)
 /* ---------------------- */
 
 /* - File reading/writing helpers - */
+// Checks if a game has already ended
 int gameAlreadyEnded(char *file_name)
 {
-
     char buffer[GENERALSIZEBUFFER], buffer1[USERINPUTBUFFER], buffer2[USERINPUTBUFFER], buffer3[USERINPUTBUFFER],
         buffer4[USERINPUTBUFFER], buffer5[USERINPUTBUFFER];
     time_t current_time, start_time;
@@ -211,6 +211,7 @@ int gameAlreadyEnded(char *file_name)
     return false;
 }
 
+// Stores the results of a game, moving the file to the appropriate directory
 int storeResult(char *file_name, char code)
 {
 
@@ -273,6 +274,7 @@ int storeResult(char *file_name, char code)
     return 0;
 }
 
+// Checks if the guess is duplicate and if the trial number is correct
 int getDupGuessAndTrialNumber(FILE *player_fd, char *guess_colours, bool *dup, int *trial_number)
 {
     char line[USERINPUTBUFFER];
@@ -293,6 +295,7 @@ int getDupGuessAndTrialNumber(FILE *player_fd, char *guess_colours, bool *dup, i
     return 0;
 }
 
+// Stars a game
 int startGame(char *PLID, char *time_buffer, char *colors, char mode, char *opcode){
 
     FILE *player_fd;
@@ -350,6 +353,7 @@ int startGame(char *PLID, char *time_buffer, char *colors, char mode, char *opco
     return 0;
 }
 
+// Gets the trials made in a game
 int readTrials(char *f_name, char *f_data, int active_game){
     char buffer[GENERALSIZEBUFFER],line[GENERALSIZEBUFFER];
     char *pointer_data;
@@ -400,6 +404,7 @@ int readTrials(char *f_name, char *f_data, int active_game){
     return 0;
 }
 
+// Gets the last game played by a player
 int findLastGame(char *PLID, char *f_name){
     struct dirent **filelist;
     int nentries, found;
@@ -430,6 +435,49 @@ int findLastGame(char *PLID, char *f_name){
     }
 
     return found;
+}
+
+int addScore(char *f_name){
+    
+    char buffer[GENERALSIZEBUFFER], time_str[USERINPUTBUFFER], new_file_name[GENERALSIZEBUFFER];
+    char PLID[7], mode_full[6], colors[5], mode_char;
+    int num_tries = 0, score = 0;
+    time_t fulltime;
+    struct tm *current_time;
+
+    FILE *fd = fopen(f_name, "r");
+
+    fgets(buffer, sizeof(buffer), fd);
+    sscanf(buffer, "%s %c %s", PLID, &mode_char, colors);
+
+    if (mode_char == 'P')
+        strcpy(mode_full, "PLAY");
+    else
+        strcpy(mode_full, "DEBUG");
+    
+    // Count the number of tries needed to win
+    while (fgets(buffer, sizeof(buffer), fd)) 
+        if (strncmp(buffer, "T:", 2) == 0)
+            num_tries++;
+    
+    fclose(fd);
+
+    // Calculate the score 
+    score = ((MAXTRIES - num_tries) * 100) / MAXTRIES;
+    
+    // Get current time
+    time(&fulltime);
+    current_time = gmtime(&fulltime);
+    sprintf(time_str, "%02d%02d%04d_%02d%02d%02d", current_time->tm_mday, current_time->tm_mon + 1, current_time->tm_year + 1900,
+            current_time->tm_hour, current_time->tm_min, current_time->tm_sec);
+
+    // Create the new score file
+    sprintf(new_file_name, "SCORES/%03d_%s_%s.txt", score, PLID, time_str);
+    fd = fopen(new_file_name, "w");
+    fprintf(fd, "%03d %s %s %d %s\n", score, PLID, colors, num_tries, mode_full);
+    fclose(fd);
+    
+    return 0;
 }
 
 /* -------------------------------- */
@@ -633,7 +681,9 @@ int tryCmd(char *client_request, char *response)
     // Player won
     if (nB == 4)
     {
-        storeResult(f_name, 'W');  
+        // addScore must be done before storeResult
+        addScore(f_name);
+        storeResult(f_name, 'W');
     }
     
     sprintf(response, "RTR OK %d %d %d\n", trial_number, nB, nW);
