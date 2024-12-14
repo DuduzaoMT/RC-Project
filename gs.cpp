@@ -976,10 +976,11 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // Remove "Address already in use" error
     if (setsockopt(tcp_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)))
     {
         perror("setsockopt");
-        exit(EXIT_FAILURE);
+        return 1;
     }
 
     // Localhost configuration
@@ -1055,7 +1056,15 @@ int main(int argc, char **argv)
                 return 1;
             }
 
-            TCPConnection(new_fd, verbose, &addr);
+            pid_t pid = fork();
+            if(pid == 0){
+                close(tcp_fd);
+                TCPConnection(new_fd, verbose, &addr);
+                close(new_fd);
+                exit(0);
+            }else{
+                close(new_fd);
+            }
         }
 
         // Test for UDP connection
