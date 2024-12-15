@@ -3,8 +3,6 @@
 
 using namespace std;
 
-int scoreboard_id = 0;
-
 // Verifies user arguments
 int verifyArg(char **user_args, int num_args, int idx, const char *prefix, void *arg_to_change, const void *default_val, bool single_argument)
 {
@@ -145,10 +143,10 @@ int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
 }
 
 // UDP connection behaviour
-int UDPConnection(int udp_fd, sockaddr_in *addr, int *trial_number, int verbose)
+int UDPConnection(int udp_fd, sockaddr_in *addr, int verbose)
 {
     char client_request[GENERALSIZEBUFFER], server_response[GENERALSIZEBUFFER];
-    char PLID[7], opcode[4];
+    char PLID[7];
     int send;
     socklen_t addrlen = sizeof(*addr);
 
@@ -168,7 +166,7 @@ int UDPConnection(int udp_fd, sockaddr_in *addr, int *trial_number, int verbose)
     printf("[UDP request]: .%s.\n", client_request);
     /* ---------------- */
 
-    sscanf(client_request, "%s %s", opcode, PLID);
+    sscanf(client_request, "%*s %s", PLID);
 
     verboseMode(verbose, PLID, client_request, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
 
@@ -282,19 +280,18 @@ int getDupGuessAndTrialNumber(FILE *player_fd, char *guess_colours, bool *dup, i
 {
     char line[USERINPUTBUFFER];
     char prev_guess[5];
-    int nt, nb, nw;
+
     (*trial_number) = 1;
+    (*dup) = false;
     while (fgets(line, sizeof(line), player_fd))
     {
-        sscanf(line, "T: %s %d %d %d", prev_guess, &nt, &nb, &nw);
+        sscanf(line, "T: %s %*d %*d %*d", prev_guess);
         (*trial_number) += 1;
         if (!strcmp(prev_guess, guess_colours))
         {
             (*dup) = true;
-            return 0;
         }
     }
-    (*dup) = false;
     return 0;
 }
 
@@ -385,7 +382,7 @@ int readTrials(char *f_name, char *f_data, int active_game)
 
         if (strncmp(buffer, "T:", 2) == 0)
         {
-            sscanf(buffer, "T: %c%c%c%c %d %d", &C1, &C2, &C3, &C4, &nb, &nw);
+            sscanf(buffer, "T: %c%c%c%c %d %d %*s", &C1, &C2, &C3, &C4, &nb, &nw);
             sprintf(line, "%c %c %c %c %d %d\n", C1, C2, C3, C4, nb, nw);
             strcpy(pointer_data, line);
             pointer_data += strlen(line);
@@ -455,14 +452,14 @@ int addScore(char *f_name)
 
     char buffer[GENERALSIZEBUFFER], time_str[USERINPUTBUFFER], new_file_name[GENERALSIZEBUFFER];
     char PLID[7], mode_full[6], colors[5], mode_char;
-    int num_tries = -1, score = 0;
+    int num_tries = 0, score = 0;
     time_t fulltime;
     struct tm *current_time;
 
     FILE *fd = fopen(f_name, "r");
 
     fgets(buffer, sizeof(buffer), fd);
-    sscanf(buffer, "%s %c %s", PLID, &mode_char, colors);
+    sscanf(buffer, "%s %c %s %*s %*s %*s %*s", PLID, &mode_char, colors);
 
     if (mode_char == 'P')
         strcpy(mode_full, "PLAY");
@@ -472,12 +469,12 @@ int addScore(char *f_name)
     // Count the number of tries needed to win
     while (fgets(buffer, sizeof(buffer), fd))
         if (strncmp(buffer, "T:", 2) == 0)
-            num_tries++;
+            num_tries+=1;
 
     fclose(fd);
 
     // Calculate the score
-    score = ((MAXTRIES - num_tries) * 100) / MAXTRIES;
+    score = ((MAXTRIES - (num_tries-1)) * 100) / MAXTRIES;
 
     // Get current time
     time(&fulltime);
@@ -488,6 +485,7 @@ int addScore(char *f_name)
     // Create the new score file
     sprintf(new_file_name, "SCORES/%03d_%s_%s.txt", score, PLID, time_str);
     fd = fopen(new_file_name, "w");
+    
     fprintf(fd, "%03d %s %s %d %s\n", score, PLID, colors, num_tries, mode_full);
     fclose(fd);
 
@@ -544,7 +542,7 @@ int findTopScores(Scorelist *list) {
 int commandHandler(char *client_request, char *response)
 {
 
-    char opcode[4];
+    char opcode[4] = {0};
     strncpy(opcode, client_request, 3);
 
     if (!strcmp(opcode, "SNG"))
@@ -703,34 +701,38 @@ int tryCmd(char *client_request, char *response)
     getDupGuessAndTrialNumber(player_fd, guess_colours, &duplicate_trial, &trial_number);
 
     // verify if the guess is equal to some other guess
+
+    fclose(player_fd);
+
+    // compare the guess
+    getBlackAndWhite(&nB, &nW, colours, guess_colours);
+
+    // exception of the INV case
+    if (duplicate_trial == true && trial_number-1 == atoi(nT_buffer)){
+        sprintf(response, "RTR OK %d %d %d\n", trial_number-1, nB, nW);
+        return 0;
+    }
+
     if (duplicate_trial == true)
     {
-        fclose(player_fd);
         sprintf(response, "RTR DUP\n");
         return 0;
     }
 
     if (atoi(nT_buffer) != trial_number)
     {
-        fclose(player_fd);
         sprintf(response, "RTR INV\n");
         return 0;
     }
 
     if (trial_number > 8)
     {
-        fclose(player_fd);
         storeResult(f_name, 'F');
         sprintf(response, "RTR ENT %c %c %c %c\n", C1, C2, C3, C4);
         return 0;
     }
 
     total_time = current_time - start_time;
-
-    fclose(player_fd);
-
-    // compare the guess
-    getBlackAndWhite(&nB, &nW, colours, guess_colours);
 
     // if exists we should open for "appending"
     player_fd = fopen(f_name, "a");
@@ -882,6 +884,7 @@ int scoreboardCmd(char *client_request, char *response)
     char line[GENERALSIZEBUFFER], f_data[GENERALSIZEBUFFER], *current_char, f_name[USERINPUTBUFFER];
     Scorelist list;
     int num_entries, f_size;
+    static int scoreboard_id=0;
 
     current_char = f_data;
 
@@ -902,9 +905,10 @@ int scoreboardCmd(char *client_request, char *response)
     
     f_size = strlen(f_data);
 
-    sprintf(f_name, "TOPSCORES_%d.txt", scoreboard_id++);
+    scoreboard_id+=1;
+    sprintf(f_name, "TOPSCORES_%d.txt", scoreboard_id);
 
-    sprintf(response, "RSS OK %s %d %s", f_name, f_size, f_data);
+    sprintf(response, "RSS OK %s %d %s\n", f_name, f_size, f_data);
 
     return 0;
 }
@@ -1023,7 +1027,6 @@ int main(int argc, char **argv)
     timeout.tv_usec = 0;
 
     // Main server loop
-    int trial_number = 1;
 
     while (1)
     {
@@ -1070,7 +1073,7 @@ int main(int argc, char **argv)
         // Test for UDP connection
         else if (FD_ISSET(udp_fd, &test_fds))
         {
-            UDPConnection(udp_fd, &addr, &trial_number, verbose);
+            UDPConnection(udp_fd, &addr, verbose);
         }
     }
 

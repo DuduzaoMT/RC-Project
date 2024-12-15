@@ -633,7 +633,7 @@ int main(int argc, char **argv)
                 }
             }
             // commands without arguments
-            else if (!strcmp(command, "sb") || !strcmp(command, "scoreboard"))
+            else if ((!strcmp(command, "sb") || !strcmp(command, "scoreboard")))
             {
                 command_status = scoreBoard(GSIP, GSport);
                 if (command_status == ERROR)
