@@ -955,8 +955,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    printf("Port: %s\nVerbose: %d\n", GSport, verbose);
-
     // UDP socket creation
     udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (udp_fd == -1)
@@ -1035,11 +1033,6 @@ int main(int argc, char **argv)
             close(tcp_fd);
             return 1;
         }
-        else if (ready == 0)
-        {
-            fprintf(stderr, "No data received\n");
-        }
-
         // Test for TCP connection
         else if (FD_ISSET(tcp_fd, &test_fds))
         {
