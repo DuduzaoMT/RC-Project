@@ -10,14 +10,13 @@ int verifyArg(char **user_args, int idx, const char *prefix, char *arg_to_change
 {
     if (strcmp(user_args[idx], prefix) == 0)
     {
-        //if (strcmp(default_val, arg_to_change))
-            //return 0;
-
         strcpy(arg_to_change, user_args[idx + 1]);
         return 0;
     }
     return 1;
 }
+
+/* - Socket connections - */
 
 // Full UDP connection
 int UDPInteraction(char *request, char *response, char *GSIP, char *GSport)
@@ -63,7 +62,6 @@ int UDPInteraction(char *request, char *response, char *GSIP, char *GSport)
             return 1;
         }
         // Send message to server
-        printf("[UDP request]: .%s.\n", request);
         send = sendto(fd, request, strlen(request), 0, server_info->ai_addr, server_info->ai_addrlen);
         if (send == -1)
         {
@@ -110,8 +108,6 @@ int UDPInteraction(char *request, char *response, char *GSIP, char *GSport)
         n_attempts--;
     }
 
-    printf("[UDP response]: .%s.\n", response);
-
     freeaddrinfo(server_info);
     freeaddrinfo(client_info);
     close(fd);
@@ -121,7 +117,6 @@ int UDPInteraction(char *request, char *response, char *GSIP, char *GSport)
 // Full TCP connection
 int TCPInteraction(char *request, char *response, char *GSIP, char *GSport)
 {
-
     int fd, errcode, nbytes, nleft, nwritten, nread;
     ssize_t n;
     socklen_t addrlen;
@@ -163,8 +158,6 @@ int TCPInteraction(char *request, char *response, char *GSIP, char *GSport)
     nbytes = strlen(request);
     nleft = nbytes;
 
-    printf("[TCP request]: .%s.\n", request);
-
     while (nleft > 0)
     {
         nwritten = write(fd, request, nleft);
@@ -190,7 +183,6 @@ int TCPInteraction(char *request, char *response, char *GSIP, char *GSport)
         else if (nread == 0)
             break; // closed by peer
         buffer[nread] = '\0';
-        printf("[TCP response]: .%s.\n", buffer);
         nleft -= nread;
         strcpy(last_digit_pointer, buffer);
         last_digit_pointer += nread;
@@ -203,6 +195,10 @@ int TCPInteraction(char *request, char *response, char *GSIP, char *GSport)
     return 0;
 }
 
+/* ---------------------- */
+
+
+/* - Commands - */
 int startCmd(char *arguments, char *GSIP, char *GSport, int *PLID, int *max_playtime, int *trial_number)
 {
 
@@ -462,7 +458,7 @@ int showTrialsCmd(char *GSIP, char *GSport, int PLID)
     {
         sscanf(response, "RST %s %s %s ", status, f_name, f_size_buffer);
 
-        f_data = (char *)malloc(atoi(f_size_buffer) * sizeof(char) + 1);
+        f_data = (char *)malloc(atoi(f_size_buffer) * sizeof(char) + 2);
 
         strcpy(f_data, response + 8 + strlen(f_name) + 1 + strlen(f_size_buffer) + 1);
 
@@ -527,7 +523,7 @@ int scoreBoard(char *GSIP, char *GSport)
     {
         sscanf(response, "RSS OK %s %s ", f_name, f_size_buffer);
 
-        f_data = (char *)malloc(atoi(f_size_buffer) * sizeof(char) + 1);
+        f_data = (char *)malloc(atoi(f_size_buffer) * sizeof(char) + 3);
 
         strcpy(f_data, response + 7 + strlen(f_name) + 1 + strlen(f_size_buffer) + 1);
 
@@ -557,6 +553,7 @@ int scoreBoard(char *GSIP, char *GSport)
 
     return 0;
 }
+/* ------------ */
 
 int main(int argc, char **argv)
 {
@@ -594,8 +591,6 @@ int main(int argc, char **argv)
         fprintf(stderr, "Invalid arguments\n");
         return 1;
     }
-
-    printf("IP: %s\nPort: %s\n", GSIP, GSport);
 
     // Player controller
     while (1)

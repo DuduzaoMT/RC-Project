@@ -46,12 +46,12 @@ int verboseMode(int verbose, char *PLID, char *request, char *ip, int port)
 void getColours(char *colours)
 {
 
-    char caracteres[] = {'R', 'G', 'B', 'Y', 'O', 'P'};
-    int tamanho_conjunto = 6;
+    char chars[] = {'R', 'G', 'B', 'Y', 'O', 'P'};
+    int size = 6;
 
     for (int i = 0; i < 4; i++)
     {
-        colours[i] = caracteres[rand() % tamanho_conjunto];
+        colours[i] = chars[rand() % size];
     }
 
     colours[4] = '\0';
@@ -96,7 +96,7 @@ int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
     int nwritten = 0;
     char buffer[GENERALSIZEBUFFER], client_request[GENERALSIZEBUFFER], server_response[GENERALSIZEBUFFER];
     char *last_digit_pointer = client_request;
-    char PLID[10], opcode[4];
+    char PLID[USERINPUTBUFFER];
 
     memset(client_request, 0, sizeof(client_request));
     memset(server_response, 0, sizeof(server_response));
@@ -107,7 +107,6 @@ int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
         if (nread == -1) /*error*/
             return 1;
         buffer[nread] = '\0';
-        printf("[TCP package Read]: .%s.\n", buffer);
         nleft -= nread;
         strcpy(last_digit_pointer, buffer);
         last_digit_pointer += nread;
@@ -127,7 +126,6 @@ int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
     /* Writing packages */
     nleft = strlen(server_response);
     last_digit_pointer = server_response;
-    printf("[TCP package Write]: .%s.\n", server_response);
     while (nleft > 0)
     {
         nwritten = write(tcp_fd, last_digit_pointer, nleft);
@@ -163,7 +161,6 @@ int UDPConnection(int udp_fd, sockaddr_in *addr, int verbose)
     else
         fprintf(stderr, "No data received\n");
 
-    printf("[UDP request]: .%s.\n", client_request);
     /* ---------------- */
 
     sscanf(client_request, "%*s %s", PLID);
@@ -179,7 +176,6 @@ int UDPConnection(int udp_fd, sockaddr_in *addr, int verbose)
         perror("sendto");
         return 1;
     }
-    printf("[UDP response]: .%s.\n", server_response);
     /* ---------------- */
 
     return 0;
@@ -190,8 +186,7 @@ int UDPConnection(int udp_fd, sockaddr_in *addr, int verbose)
 // Checks if a game has already ended
 int gameAlreadyEnded(char *file_name)
 {
-    char buffer[GENERALSIZEBUFFER], buffer1[USERINPUTBUFFER], buffer2[USERINPUTBUFFER], buffer3[USERINPUTBUFFER],
-        buffer4[USERINPUTBUFFER], buffer5[USERINPUTBUFFER];
+    char buffer[GENERALSIZEBUFFER];
     time_t current_time, start_time;
     int total_time;
     FILE *player_fd;
@@ -203,7 +198,7 @@ int gameAlreadyEnded(char *file_name)
         return ERROR;
 
     fgets(buffer, sizeof(buffer), player_fd);
-    sscanf(buffer, "%s %s %s %d %s %s %ld", buffer1, buffer2, buffer3, &total_time, buffer4, buffer5, &start_time);
+    sscanf(buffer, "%*s %*s %*s %d %*s %*s %ld", &total_time, &start_time);
 
     fclose(player_fd);
 
@@ -884,7 +879,6 @@ int scoreboardCmd(char *client_request, char *response)
     char line[GENERALSIZEBUFFER], f_data[GENERALSIZEBUFFER], *current_char, f_name[USERINPUTBUFFER];
     Scorelist list;
     int num_entries, f_size;
-    static int scoreboard_id=0;
 
     current_char = f_data;
 
@@ -905,8 +899,7 @@ int scoreboardCmd(char *client_request, char *response)
     
     f_size = strlen(f_data);
 
-    scoreboard_id+=1;
-    sprintf(f_name, "TOPSCORES_%d.txt", scoreboard_id);
+    sprintf(f_name, "TOPSCORES.txt");
 
     sprintf(response, "RSS OK %s %d %s\n", f_name, f_size, f_data);
 
@@ -1051,6 +1044,8 @@ int main(int argc, char **argv)
         else if (FD_ISSET(tcp_fd, &test_fds))
         {
             int new_fd;
+            
+            socklen_t addrlen = sizeof(addr);
 
             new_fd = accept(tcp_fd, (struct sockaddr *)&addr, &addrlen);
             if (new_fd == -1)

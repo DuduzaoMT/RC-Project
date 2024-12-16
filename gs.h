@@ -13,9 +13,7 @@
 #define MAXTRIES 8              // Maximum number of tries
 #define MAXTRIESLEN 1           // Maximum number tries len
 
-#define ERR 9
-#define NOK 8
-#define OK 7
+#define ERR 9                   // Error code for the requests
 /* ------------- */
 
 /* - Macros - */
@@ -38,6 +36,8 @@ typedef struct scorelist
 int verifyArg(char **user_args, int num_args, int idx, const char *prefix, void *arg_to_change,
               const void *default_val, bool single_argument);
 int verboseMode(int verbose, int PLID, char *request, char *ip, char *port);
+void getColours(char *colours);
+int getBlackAndWhite(int *nB, int *nW, char *colours, char *guess_colours);
 
 // - File reading/writing
 int gameAlreadyEnded(char *file_name);
@@ -49,12 +49,8 @@ int findLastGame(char *PLID, char *response);
 int addScore(char *PLID, char *response);
 int findTopScores(Scorelist *list);
 
-// - General
-void getColours(char *colours);
-int getBlackAndWhite(int *nB, int *nW, char *colours, char *guess_colours);
-
 // Socket connections 
-int TCPConnection(int tcp_fd, int verbose);
+int TCPConnection(int tcp_fd, int verbose, int scoreboard_id);
 int UDPConnection(int udp_fd, struct sockaddr_in *addr, int verbose);
 
 // Commands

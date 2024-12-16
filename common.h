@@ -17,7 +17,7 @@
 // Commands
 #define GSPORTPREFIX "-p\0"     // Gsport's prefix
 #define MAXPORTSIZE 6           // Maximum port size
-#define PORT "58001"            // Default port (58000 + GroupNo)
+#define PORT "58057"            // Default port (58000 + GroupNo)
 
 // Helpers
 #define GENERALSIZEBUFFER 2048  // General size to auxiliar buffers
