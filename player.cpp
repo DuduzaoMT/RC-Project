@@ -513,7 +513,7 @@ int scoreBoard(char *GSIP, char *GSport)
         return ERROR;
     }
 
-    if (!strncmp(response, "RSS EMPTY", 8))
+    if (!strncmp(response, "RSS EMPTY", 9))
     {
         fprintf(stderr, "No player has won yet\n");
         return 0;
