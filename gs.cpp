@@ -350,14 +350,14 @@ int startGame(char *PLID, char *time_buffer, char *colors, char mode, char *opco
 }
 
 // Gets the trials made in a game
-int readTrials(char *f_name, char *f_data, int active_game)
+int readTrials(char *f_name, char *f_data, int active_game, char *opcode)
 {
     char buffer[GENERALSIZEBUFFER], line[GENERALSIZEBUFFER];
     char *pointer_data;
     char C1, C2, C3, C4;
     int nb, nw;
     time_t current_time = 0, start_time = 0;
-    int total_time, remaining_time;
+    int total_time, remaining_time, num_tries = 0;
 
     time(&current_time);
 
@@ -381,25 +381,46 @@ int readTrials(char *f_name, char *f_data, int active_game)
             sprintf(line, "%c %c %c %c %d %d\n", C1, C2, C3, C4, nb, nw);
             strcpy(pointer_data, line);
             pointer_data += strlen(line);
+            num_tries += 1;
         }
     }
 
-    remaining_time = total_time - (current_time - start_time);
-    if (remaining_time > 0)
+    if (active_game)
     {
-        sprintf(line, "%d", remaining_time);
-        strcpy(pointer_data, line);
-        fclose(fd);
+        remaining_time = total_time - (current_time - start_time);
+        if (remaining_time > 0 && num_tries < MAXTRIES)
+        {
+            sprintf(line, "Remaining time: %d\n", remaining_time);
+            strcpy(pointer_data, line);
+            fclose(fd);
+            strcpy(opcode, "ACT");
+        }
+        else
+        {
+            sprintf(line, "Game already finished");
+            strcpy(pointer_data, line);
+            fclose(fd);
+            // If the game was still active, store the results
+            if (remaining_time <= 0)
+            {
+                storeResult(f_name, 'T');
+            }
+            else if (num_tries >= MAXTRIES)
+            {
+                storeResult(f_name, 'F');
+            }
+
+            strcpy(opcode, "FIN");
+        }
     }
     else
     {
         sprintf(line, "Game already finished");
         strcpy(pointer_data, line);
         fclose(fd);
-        // If the game was still active, store the results
-        if (active_game)
-            storeResult(f_name, 'T');
+        strcpy(opcode, "FIN");
     }
+
     return 0;
 }
 
@@ -464,12 +485,12 @@ int addScore(char *f_name)
     // Count the number of tries needed to win
     while (fgets(buffer, sizeof(buffer), fd))
         if (strncmp(buffer, "T:", 2) == 0)
-            num_tries+=1;
+            num_tries += 1;
 
     fclose(fd);
 
     // Calculate the score
-    score = ((MAXTRIES - (num_tries-1)) * 100) / MAXTRIES;
+    score = ((MAXTRIES - (num_tries - 1)) * 100) / MAXTRIES;
 
     // Get current time
     time(&fulltime);
@@ -480,7 +501,7 @@ int addScore(char *f_name)
     // Create the new score file
     sprintf(new_file_name, "SCORES/%03d_%s_%s.txt", score, PLID, time_str);
     fd = fopen(new_file_name, "w");
-    
+
     fprintf(fd, "%03d %s %s %d %s\n", score, PLID, colors, num_tries, mode_full);
     fclose(fd);
 
@@ -488,7 +509,8 @@ int addScore(char *f_name)
 }
 
 // Reads the top 10 scores and returns the number of entries
-int findTopScores(Scorelist *list) {
+int findTopScores(Scorelist *list)
+{
     struct dirent **filelist;
     int nentries, ifile;
     char fname[300];
@@ -497,18 +519,24 @@ int findTopScores(Scorelist *list) {
 
     // Get the list of files in the directory
     nentries = scandir("SCORES/", &filelist, 0, alphasort);
-    if (nentries <= 0) {
+    if (nentries <= 0)
+    {
         return 0; // No files found
-    } else {
+    }
+    else
+    {
         ifile = 0;
 
-        while (nentries--) {
+        while (nentries--)
+        {
             // Ignore hidden files and limit to 10 entries
-            if (filelist[nentries]->d_name[0] != '.' && ifile < 10) {
+            if (filelist[nentries]->d_name[0] != '.' && ifile < 10)
+            {
                 sprintf(fname, "SCORES/%s", filelist[nentries]->d_name);
 
                 fp = fopen(fname, "r");
-                if (fp != NULL) {
+                if (fp != NULL)
+                {
                     fscanf(fp, "%d %s %s %d %s",
                            &list->score[ifile],
                            list->PLID[ifile],
@@ -519,16 +547,16 @@ int findTopScores(Scorelist *list) {
                     strcpy(list->mode[ifile], mode);
 
                     fclose(fp);
-                    ++ifile;    
+                    ++ifile;
                 }
             }
-            free(filelist[nentries]); 
+            free(filelist[nentries]);
         }
-        free(filelist); 
+        free(filelist);
     }
 
-    list->nscores = ifile; 
-    return ifile;          
+    list->nscores = ifile;
+    return ifile;
 }
 
 /* -------------------------------- */
@@ -703,8 +731,9 @@ int tryCmd(char *client_request, char *response)
     getBlackAndWhite(&nB, &nW, colours, guess_colours);
 
     // exception of the INV case
-    if (duplicate_trial == true && trial_number-1 == atoi(nT_buffer)){
-        sprintf(response, "RTR OK %d %d %d\n", trial_number-1, nB, nW);
+    if (duplicate_trial == true && trial_number - 1 == atoi(nT_buffer))
+    {
+        sprintf(response, "RTR OK %d %d %d\n", trial_number - 1, nB, nW);
         return 0;
     }
 
@@ -720,7 +749,7 @@ int tryCmd(char *client_request, char *response)
         return 0;
     }
 
-    if (trial_number > 8)
+    if (trial_number >= MAXTRIES)
     {
         storeResult(f_name, 'F');
         sprintf(response, "RTR ENT %c %c %c %c\n", C1, C2, C3, C4);
@@ -853,17 +882,15 @@ int showTrialsCmd(char *client_request, char *response)
             return ERROR;
         }
 
-        readTrials(f_name, f_data, false);
+        readTrials(f_name, f_data, false, opcode);
         f_size = strlen(f_data);
     }
     else
     {
-        // Player has an ongoing game
-        sprintf(opcode, "ACT");
-
+        // Player might have an ongoing game
         fclose(player_fd);
 
-        readTrials(f_name, f_data, true);
+        readTrials(f_name, f_data, true, opcode);
         f_size = strlen(f_data);
     }
 
@@ -896,7 +923,7 @@ int scoreboardCmd(char *client_request, char *response)
         strcpy(current_char, line);
         current_char += strlen(line);
     }
-    
+
     f_size = strlen(f_data);
 
     sprintf(f_name, "TOPSCORES.txt");
@@ -1037,7 +1064,7 @@ int main(int argc, char **argv)
         else if (FD_ISSET(tcp_fd, &test_fds))
         {
             int new_fd;
-            
+
             socklen_t addrlen = sizeof(addr);
 
             new_fd = accept(tcp_fd, (struct sockaddr *)&addr, &addrlen);
@@ -1048,12 +1075,15 @@ int main(int argc, char **argv)
             }
 
             pid_t pid = fork();
-            if(pid == 0){
+            if (pid == 0)
+            {
                 close(tcp_fd);
                 TCPConnection(new_fd, verbose, &addr);
                 close(new_fd);
                 exit(0);
-            }else{
+            }
+            else
+            {
                 close(new_fd);
             }
         }
