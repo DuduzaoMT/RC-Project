@@ -23,6 +23,9 @@
 #define GENERALSIZEBUFFER 2048  // General size to auxiliar buffers
 #define USERINPUTBUFFER 128     // Buffer to store user input
 
+#define PLIDSIZE 7              // Player ID
+#define COLORBUFFERSIZE 4       // Number of colors
+
 #define UNKNOWN -1
 #define FALSE 0
 #define TRUE 1

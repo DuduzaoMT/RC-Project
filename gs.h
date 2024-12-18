@@ -23,8 +23,8 @@
 typedef struct scorelist
 {
     int score[10];
-    char PLID[10][7];
-    char colors[10][5];
+    char PLID[10][PLIDSIZE];
+    char colors[10][COLORBUFFERSIZE];
     int num_tries[10];
     char mode[10][6];
     int nscores;

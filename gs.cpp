@@ -96,7 +96,7 @@ int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
     int nwritten = 0;
     char buffer[GENERALSIZEBUFFER], client_request[GENERALSIZEBUFFER], server_response[GENERALSIZEBUFFER];
     char *last_digit_pointer = client_request;
-    char PLID[USERINPUTBUFFER];
+    char PLID[PLIDSIZE];
 
     memset(client_request, 0, sizeof(client_request));
     memset(server_response, 0, sizeof(server_response));
@@ -144,7 +144,7 @@ int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
 int UDPConnection(int udp_fd, sockaddr_in *addr, int verbose)
 {
     char client_request[GENERALSIZEBUFFER], server_response[GENERALSIZEBUFFER];
-    char PLID[7];
+    char PLID[PLIDSIZE];
     int send;
     socklen_t addrlen = sizeof(*addr);
 
@@ -211,7 +211,7 @@ int gameAlreadyEnded(char *file_name)
 int storeResult(char *file_name, char code)
 {
 
-    char buffer[GENERALSIZEBUFFER], PLID[USERINPUTBUFFER], YYYYMMDD[USERINPUTBUFFER], HHMMSS[USERINPUTBUFFER];
+    char buffer[GENERALSIZEBUFFER], PLID[PLIDSIZE], YYYYMMDD[USERINPUTBUFFER], HHMMSS[USERINPUTBUFFER];
     char new_file_name[GENERALSIZEBUFFER];
     int year, month, day, hour, minute, second;
     time_t current_time, start_time, finish_time;
@@ -467,7 +467,7 @@ int addScore(char *f_name)
 {
 
     char buffer[GENERALSIZEBUFFER], time_str[USERINPUTBUFFER], new_file_name[GENERALSIZEBUFFER];
-    char PLID[7], mode_full[6], colors[5], mode_char;
+    char PLID[PLIDSIZE], mode_full[6], colors[COLORBUFFERSIZE], mode_char;
     int num_tries = 0, score = 0;
     time_t fulltime;
     struct tm *current_time;
@@ -626,7 +626,7 @@ int commandHandler(char *client_request, char *response)
 
 int startCmd(char *client_request, char *response)
 {
-    char PLID_buffer[USERINPUTBUFFER], time_buffer[USERINPUTBUFFER], colors[5], opcode[4];
+    char PLID_buffer[USERINPUTBUFFER], time_buffer[USERINPUTBUFFER], colors[COLORBUFFERSIZE], opcode[4];
 
     memset(PLID_buffer, 0, sizeof(PLID_buffer));
     memset(time_buffer, 0, sizeof(time_buffer));
@@ -781,7 +781,7 @@ int tryCmd(char *client_request, char *response)
 
 int quitCmd(char *client_request, char *response)
 {
-    char PLID_buffer[USERINPUTBUFFER], f_name[GENERALSIZEBUFFER], colors[5], C1, C2, C3, C4;
+    char PLID_buffer[USERINPUTBUFFER], f_name[GENERALSIZEBUFFER], colors[COLORBUFFERSIZE], C1, C2, C3, C4;
     FILE *player_fd;
 
     memset(PLID_buffer, 0, sizeof(PLID_buffer));
@@ -817,7 +817,7 @@ int quitCmd(char *client_request, char *response)
 
 int debugCmd(char *client_request, char *response)
 {
-    char PLID_buffer[USERINPUTBUFFER], time_buffer[USERINPUTBUFFER], C1, C2, C3, C4, opcode[4], colors[5];
+    char PLID_buffer[USERINPUTBUFFER], time_buffer[USERINPUTBUFFER], C1, C2, C3, C4, opcode[4], colors[COLORBUFFERSIZE];
     memset(PLID_buffer, 0, sizeof(PLID_buffer));
     memset(time_buffer, 0, sizeof(time_buffer));
 
