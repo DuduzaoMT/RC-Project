@@ -8,7 +8,7 @@ player: player.cpp
 	$(CC) -o player player.cpp common.cpp
 
 gs: gs.cpp
-	$(CC) -o gs gs.cpp common.cpp
+	$(CC) -o GS gs.cpp common.cpp
  
 clean:
-	rm -f player gs
+	rm -f player GS
