@@ -96,7 +96,7 @@ int TCPConnection(int tcp_fd, int verbose, sockaddr_in *addr)
     int nwritten = 0;
     char buffer[GENERALSIZEBUFFER], client_request[GENERALSIZEBUFFER], server_response[GENERALSIZEBUFFER];
     char *last_digit_pointer = client_request;
-    char PLID[PLIDSIZE];
+    char PLID[USERINPUTBUFFER];
 
     memset(client_request, 0, sizeof(client_request));
     memset(server_response, 0, sizeof(server_response));
