@@ -258,7 +258,7 @@ int tryCmd(char *arguments, char *GSIP, char *GSport, int *trial_number, int PLI
     int nB, nW, r_trial_number = -1;
 
     
-    int n_args = sscanf(arguments, "%s %s %s %s", &C1, &C2, &C3, &C4);
+    int n_args = sscanf(arguments, " %c %c %c %c", &C1, &C2, &C3, &C4);
     
     if (n_args != 4 || strlen(arguments) != 9)
     {
