@@ -1,6 +1,5 @@
 # RC Project
-Group number 57
-Duarte Laia, 106876
-Eduardo Silva, 106929
+Duarte Laia
+Eduardo Silva
 
-The only auxiliary files are common.cpp and common.h
+Auxiliary files are common.cpp and common.h
